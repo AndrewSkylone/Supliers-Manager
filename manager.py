@@ -2,8 +2,6 @@ import os
 import sys
 import tkinter as tk
 import re
-from datetime import datetime
-
 
 from selenium import webdriver
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
@@ -13,13 +11,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 import openpyxl
 
-def benchmark(func):
-    def wrapper(*args, **kwargs):
-        start = datetime.now()
-        func(*args, **kwargs)
-        print(f"{str(func)}:", (datetime.now() - start))
-
-    return wrapper
 
 class Suplier_Manager(object):
     def __init__(self, driver):
@@ -34,6 +25,7 @@ class Suplier_Manager(object):
     def create_widgets(self):
         tk.Button(self, text="read supliers table", command=self.read_supliers_table).grid()
         tk.Button(self, text="read file", command=lambda: self.read_file(name=self.filename.get())).grid()
+        tk.Button(self, text="save file", command=lambda: self.save_file(name="Test.xlsx")).grid()
     
     def read_supliers_table(self):
         # self.orders = self.driver.read_supliers_table()
@@ -46,8 +38,8 @@ class Suplier_Manager(object):
         employers = self.employers
         for col in range(len(employers)):
             sheet.cell(row=1, column=col + 1, value=self.employers[col].name)
-            for row in range(len(employers[col])):
-                sheet.cell(row=row + 2, column=col + 2, value=employers[col][row])
+            for row in range(len(employers[col].orders)):
+                sheet.cell(row=row + 2, column=col + 1, value=employers[col].orders[row])
 
         workbook.save(os.path.join(path, name))
     
@@ -55,18 +47,18 @@ class Suplier_Manager(object):
         self.filename.set(name)
         workbook = openpyxl.load_workbook(filename=os.path.join(path, name))
         sheet = workbook.active
+        self.employers = []
 
         for column in sheet.columns:
             employer_name = column[0].value
-
             employer_orders = []
             for cell in column[1:]:
                 if not cell.value:
                     break
                 employer_orders.append(cell.value) 
 
-            print(employer_name)
             self.employers.append(Employer(name=employer_name, orders=employer_orders))
+
     
     def set_filename_title(self, *args):
         self.title(title=self.filename.get())
