@@ -13,13 +13,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 import openpyxl
 
-
-# wb = openpyxl.load_workbook(os.path.join(os.path.dirname(__file__), "supliers.xlsx"))
-# ws = wb.active
-# ws['A1'] = 42
-# ws.append([1, 2, 3])
-# wb.save(os.path.join(os.path.dirname(__file__), "supliers.xlsx"))
-
 def benchmark(func):
     def wrapper(*args, **kwargs):
         start = datetime.now()
@@ -31,14 +24,60 @@ def benchmark(func):
 class Suplier_Manager(object):
     def __init__(self, driver):
         self.driver = driver
+        self.filename = tk.StringVar()
+        self.filename.set("Supliers.xlsx")
+        self.filename.trace("w", self.set_filename_title)
+        self.employers = []
 
         self.create_widgets()
         
     def create_widgets(self):
-        tk.Button(self, text="test button", command=self.read_supliers_table).grid()
+        tk.Button(self, text="read supliers table", command=self.read_supliers_table).grid()
+        tk.Button(self, text="read file", command=lambda: self.read_file(name=self.filename.get())).grid()
     
     def read_supliers_table(self):
-        self.driver.read_supliers_table()
+        # self.orders = self.driver.read_supliers_table()
+        self.save_file(name=self.filename.get())
+    
+    def save_file(self, path=os.path.dirname(__file__), name="Table.xlsx"):        
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+
+        employers = self.employers
+        for col in range(len(employers)):
+            sheet.cell(row=1, column=col + 1, value=self.employers[col].name)
+            for row in range(len(employers[col])):
+                sheet.cell(row=row + 2, column=col + 2, value=employers[col][row])
+
+        workbook.save(os.path.join(path, name))
+    
+    def read_file(self, path=os.path.dirname(__file__), name="Table.xlsx"):
+        self.filename.set(name)
+        workbook = openpyxl.load_workbook(filename=os.path.join(path, name))
+        sheet = workbook.active
+
+        for column in sheet.columns:
+            employer_name = column[0].value
+
+            employer_orders = []
+            for cell in column[1:]:
+                if not cell.value:
+                    break
+                employer_orders.append(cell.value) 
+
+            print(employer_name)
+            self.employers.append(Employer(name=employer_name, orders=employer_orders))
+    
+    def set_filename_title(self, *args):
+        self.title(title=self.filename.get())
+    
+    def title(self, title):
+        raise NotImplementedError
+
+class Employer(object):
+    def __init__(self, name, orders):
+        self.name = name
+        self.orders = orders
 
 class Suplier_Manager_TopLevel(Suplier_Manager, tk.Toplevel):
     """ Singleton """
@@ -52,10 +91,7 @@ class Suplier_Manager_TopLevel(Suplier_Manager, tk.Toplevel):
         mouseX, mouseY = self.get_mouse_position()
         self.geometry(f"+{mouseX}+{mouseY}")
         self.resizable(False, False)
-            
-    def title(self, title):
-        tk.Toplevel.title(self, title)
-    
+                
     def get_mouse_position(self):
         return self.master.winfo_pointerx(), self.master.winfo_pointery()
 
@@ -63,6 +99,9 @@ class Suplier_Manager_TopLevel(Suplier_Manager, tk.Toplevel):
         if hasattr(cls, "instance"):
             cls.instance.destroy()
         return tk.Toplevel.__new__(cls)
+    
+    def title(self, title):
+        tk.Toplevel.title(self, title)
 
 class Suplier_Manager_Frame(Suplier_Manager, tk.Frame):
     def __init__(self, master, driver, cnf={}, **kw):
@@ -88,11 +127,11 @@ class Extended_Webdriver(webdriver.Chrome):
 
         if current_page != 1:
             self.goto_nes_table_first_page(table_element=table_element)
-            orders += self.read_supliers_page_orders(table_element=table_element)
 
-        for i in range(1, last_page):
-            self.goto_nes_table_next_page(table_element=table_element)
+        for current in range(last_page):
             orders += self.read_supliers_page_orders(table_element=table_element)
+            if current < last_page:
+                self.goto_nes_table_next_page(table_element=table_element)
     
         return orders
 
@@ -102,14 +141,14 @@ class Extended_Webdriver(webdriver.Chrome):
         first_button = table_element.find_element_by_link_text("First")
         driver.execute_script("arguments[0].click()", first_button)        
         WebDriverWait(driver, 5).until_not(EC.text_to_be_present_in_element((By.CLASS_NAME, "table-primary"), table_element.text))
-        
+    
     def goto_nes_table_next_page(self, table_element):
         """ Press next button in NES table. Checking if table text changed, else page not switched """
 
         next_button = table_element.find_element_by_link_text("Next")
         driver.execute_script("arguments[0].click()", next_button)
         WebDriverWait(driver, 5).until_not(EC.text_to_be_present_in_element((By.CLASS_NAME, "table-primary"), table_element.text))
-        
+
     def read_supliers_page_orders(self, table_element) -> list:
         tbody_element = table_element.find_element(By.CSS_SELECTOR, "tbody")
         rows = len(tbody_element.find_elements(By.CSS_SELECTOR, "tr"))
@@ -145,10 +184,10 @@ if __name__ == "__main__":
             root.destroy()
 
     root = tk.Tk()
-    root.protocol("WM_DELETE_WINDOW", on_closing)    
+    # root.protocol("WM_DELETE_WINDOW", on_closing)    
 
-    driver = create_profile_chrome_driver()
-    driver.get("https://nesky.hktemas.com/no-suppliers")
-    frame = Suplier_Manager_Frame(root, driver=driver)
+    # driver = create_profile_chrome_driver()
+    # driver.get("https://nesky.hktemas.com/no-suppliers")
+    frame = Suplier_Manager_Frame(root, driver=None)#driver)
     frame.grid()    
     root.mainloop()
