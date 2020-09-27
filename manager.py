@@ -38,9 +38,7 @@ class Suplier_Manager(object):
         tk.Button(self, text="test button", command=self.read_supliers_table).grid()
     
     def read_supliers_table(self):
-        start = datetime.now()
         self.driver.read_supliers_table()
-        print("read_supliers_table:", (datetime.now() - start).seconds)
 
 class Suplier_Manager_TopLevel(Suplier_Manager, tk.Toplevel):
     """ Singleton """
@@ -93,15 +91,10 @@ class Extended_Webdriver(webdriver.Chrome):
             orders += self.read_supliers_page_orders(table_element=table_element)
 
         for i in range(1, last_page):
-            start = datetime.now()
             self.goto_nes_table_next_page(table_element=table_element)
-            print("next_page:", (datetime.now() - start))
-            start = datetime.now()
             orders += self.read_supliers_page_orders(table_element=table_element)
-            print("read_supliers:", (datetime.now() - start))
     
-        # print(orders)
-        # return orders
+        return orders
 
     def goto_nes_table_first_page(self, table_element):
         """ Press first button in NES table. Checking if table text changed, else page not switched """
@@ -113,88 +106,22 @@ class Extended_Webdriver(webdriver.Chrome):
     def goto_nes_table_next_page(self, table_element):
         """ Press next button in NES table. Checking if table text changed, else page not switched """
 
-        start = datetime.now()        
         next_button = table_element.find_element_by_link_text("Next")
-        print("next_button:", (datetime.now() - start), end="\t")
-
-        start = datetime.now()        
         driver.execute_script("arguments[0].click()", next_button)
-        print("click:", (datetime.now() - start), end="\t")
-
-        start = datetime.now()        
         WebDriverWait(driver, 5).until_not(EC.text_to_be_present_in_element((By.CLASS_NAME, "table-primary"), table_element.text))
-        print("waiting:", (datetime.now() - start), end="\t")
-    
-    def __read_supliers_page_orders(self, table_element) -> list:
-        start = datetime.now()        
-        tbody_element = table_element.find_element(By.CSS_SELECTOR, "tbody")
-        print("tbody_element:", (datetime.now() - start), end="\t")
-
-        start = datetime.now()        
-        tr_elements = tbody_element.find_elements(By.CSS_SELECTOR, "tr")
-        print("tr_elements:", (datetime.now() - start), end="\t")
         
-        orders = []
-
-        start = datetime.now()        
-        for tr_element in tr_elements:
-            order = []
-            for column in (1, 2, 5):
-                cell_element = tr_element.find_element(By.CSS_SELECTOR, f"td:nth-child({column})")
-                order.append(cell_element.text)
-            orders.append(order)
-        print("reading data:", (datetime.now() - start), end="\t")
-
-        return orders
-    
-    def _read_supliers_page_orders(self, table_element) -> list:
-        start = datetime.now()        
-        tbody_element = table_element.find_element(By.CSS_SELECTOR, "tbody")
-        print("tbody_element:", (datetime.now() - start), end="\t")
-
-        start = datetime.now()
-        rows = len(tbody_element.find_elements(By.CSS_SELECTOR, "tr"))
-        print("rows:", (datetime.now() - start), end="\t")
-
-        start = datetime.now()        
-        td_elements = tbody_element.find_elements(By.CSS_SELECTOR, "td")
-        print("td_elements:", (datetime.now() - start), end="\t")
-        
-        orders = []
-
-        start = datetime.now()        
-        for row in range(1, rows + 1):
-            order = []
-            for col in (1, 2, 5):
-                order.append(td_elements[row * col].text)
-            orders.append(order)
-        print("reading data:", (datetime.now() - start), end="\t")
-
-        return orders
-    
     def read_supliers_page_orders(self, table_element) -> list:
-        start = datetime.now()        
         tbody_element = table_element.find_element(By.CSS_SELECTOR, "tbody")
-        print(tbody_element.source )
-        print("tbody_element:", (datetime.now() - start), end="\t")
-
-        start = datetime.now()
         rows = len(tbody_element.find_elements(By.CSS_SELECTOR, "tr"))
-        print("rows:", (datetime.now() - start), end="\t")
-
-        start = datetime.now()        
         td_elements = tbody_element.find_elements(By.CSS_SELECTOR, "td")
-        print("td_elements:", (datetime.now() - start), end="\t")
         
         orders = []
 
-        start = datetime.now()        
         for row in range(1, rows + 1):
             order = []
             for col in (1, 2, 5):
                 order.append(td_elements[row * col].text)
             orders.append(order)
-        print("reading data:", (datetime.now() - start), end="\t")
 
         return orders
 
