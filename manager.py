@@ -2,6 +2,9 @@ import os
 import sys
 import tkinter as tk
 import re
+from datetime import datetime
+import csv
+import copy
 
 from selenium import webdriver
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
@@ -12,26 +15,58 @@ from selenium.webdriver.support.ui import WebDriverWait
 import openpyxl
 
 
+def read_settings(file_path) -> dict:
+    with open(file_path, 'r', newline='') as csvfile:
+        return next(csv.DictReader(csvfile, delimiter=";"))
+
+MANAGER_DIR_PATH = os.path.dirname(__file__)
+settings = read_settings(file_path=os.path.join(MANAGER_DIR_PATH, "settings", "settings.csv"))
+
 class Suplier_Manager(object):
     def __init__(self, driver):
-        self.driver = driver
         self.filename = tk.StringVar()
-        self.filename.set("Supliers.xlsx")
+        self.filename.set("Employers orders.xlsx")
         self.filename.trace("w", self.set_filename_title)
+
+        self.driver = driver
+        self.__orders = []
+        self.__listeners = []
         self.employers = []
 
         self.create_widgets()
         
     def create_widgets(self):
         tk.Button(self, text="read supliers table", command=self.read_supliers_table).grid()
-        tk.Button(self, text="read file", command=lambda: self.read_file(name=self.filename.get())).grid()
-        tk.Button(self, text="save file", command=lambda: self.save_file(name="Test.xlsx")).grid()
+        tk.Button(self, text="read file", command=lambda: self.read_file(file_path=os.path.join(MANAGER_DIR_PATH, self.filename.get()))).grid()
+        tk.Button(self, text="save file", command=lambda: self.save_orders_to_file(file_path=os.path.join(MANAGER_DIR_PATH, "Orders.xlsx"))).grid()
     
     def read_supliers_table(self):
-        # self.orders = self.driver.read_supliers_table()
-        self.save_file(name=self.filename.get())
+        self.orders = self.driver.read_supliers_table()
     
-    def save_file(self, path=os.path.dirname(__file__), name="Table.xlsx"):        
+    def get_orders(self) -> list:
+        return copy.deepcopy(self.__orders)
+    
+    def set_orders(self, new_orders):
+        self.__orders = copy.deepcopy(new_orders)
+
+    def on_orders_changed(self):
+        for listener in self.__listeners:
+            listener.on_orders_changed(orders=self.get_orders())
+    
+    def save_orders_to_file(self, file_path=os.path.join(MANAGER_DIR_PATH, "Table.xlsx")):        
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+
+        for row in self.orders:
+            sheet.append(row)
+
+        workbook.save(filename=file_path)
+
+        if settings.get("save backups", "No") == "Yes":
+            date = datetime.today().strftime(r"%H.%M %d-%m-%Y")
+            workbook.save(filename=os.path.join(MANAGER_DIR_PATH, 'Backups', f'{date}.xlsx'))
+
+    def save_employers_orders_to_file(self, file_path=os.path.join(MANAGER_DIR_PATH, "Table.xlsx")):
         workbook = openpyxl.Workbook()
         sheet = workbook.active
 
@@ -41,16 +76,17 @@ class Suplier_Manager(object):
             for row in range(len(employers[col].orders)):
                 sheet.cell(row=row + 2, column=col + 1, value=employers[col].orders[row])
 
-        workbook.save(os.path.join(path, name))
+        workbook.save(file_path)
     
-    def read_file(self, path=os.path.dirname(__file__), name="Table.xlsx"):
-        self.filename.set(name)
-        workbook = openpyxl.load_workbook(filename=os.path.join(path, name))
+    def read_file(self, file_path=os.path.join(MANAGER_DIR_PATH, "Table.xlsx")):
+        self.filename.set(os.path.basename(file_path))
+        workbook = openpyxl.load_workbook(filename=file_path)
         sheet = workbook.active
         self.employers = []
 
         for column in sheet.columns:
             employer_name = column[0].value
+
             employer_orders = []
             for cell in column[1:]:
                 if not cell.value:
@@ -58,8 +94,11 @@ class Suplier_Manager(object):
                 employer_orders.append(cell.value) 
 
             self.employers.append(Employer(name=employer_name, orders=employer_orders))
+        
+        for employer in self.employers:
+            print(f'{employer.name=} \t {employer.orders=}')
 
-    
+       
     def set_filename_title(self, *args):
         self.title(title=self.filename.get())
     
@@ -117,12 +156,16 @@ class Extended_Webdriver(webdriver.Chrome):
         current_page = int(pages.group(1))
         last_page = int(pages.group(2))
 
+        #############test###########
+        last_page=5
+        #############test###########
+
         if current_page != 1:
             self.goto_nes_table_first_page(table_element=table_element)
 
         for current in range(last_page):
             orders += self.read_supliers_page_orders(table_element=table_element)
-            if current < last_page:
+            if current < last_page - 1:
                 self.goto_nes_table_next_page(table_element=table_element)
     
         return orders
@@ -142,16 +185,20 @@ class Extended_Webdriver(webdriver.Chrome):
         WebDriverWait(driver, 5).until_not(EC.text_to_be_present_in_element((By.CLASS_NAME, "table-primary"), table_element.text))
 
     def read_supliers_page_orders(self, table_element) -> list:
+        """ Read supliers 1, 2, 5 columns data. Using search all td elements instead selector because it faster """
+
         tbody_element = table_element.find_element(By.CSS_SELECTOR, "tbody")
         rows = len(tbody_element.find_elements(By.CSS_SELECTOR, "tr"))
         td_elements = tbody_element.find_elements(By.CSS_SELECTOR, "td")
+        COLUMNS = 8
         
         orders = []
 
-        for row in range(1, rows + 1):
+        for row in range(rows):
             order = []
-            for col in (1, 2, 5):
-                order.append(td_elements[row * col].text)
+            for col in (0, 1, 4):
+                index = row * COLUMNS + col
+                order.append(td_elements[index].text)
             orders.append(order)
 
         return orders
@@ -176,10 +223,13 @@ if __name__ == "__main__":
             root.destroy()
 
     root = tk.Tk()
+
+    driver = None
     # root.protocol("WM_DELETE_WINDOW", on_closing)    
 
     # driver = create_profile_chrome_driver()
     # driver.get("https://nesky.hktemas.com/no-suppliers")
-    frame = Suplier_Manager_Frame(root, driver=None)#driver)
+    
+    frame = Suplier_Manager_Frame(root, driver=driver)
     frame.grid()    
     root.mainloop()
