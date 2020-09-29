@@ -21,6 +21,7 @@ def read_settings(file_path) -> dict:
 
 MANAGER_DIR_PATH = os.path.dirname(__file__)
 settings = read_settings(file_path=os.path.join(MANAGER_DIR_PATH, "settings", "settings.csv"))
+FREE_MARK = ' '
 
 class Suplier_Manager(object):
     def __init__(self, driver):
@@ -34,7 +35,7 @@ class Suplier_Manager(object):
         for employer in self.get_employers():
             self.subscribe(employer)
         self.set_orders(new_orders=self.filemanager.get_orders_from_file(file_path=os.path.join(MANAGER_DIR_PATH, "Orders.xlsx")))
-        print(self.get_orders())
+
         self.create_widgets()
 
     def create_widgets(self):
@@ -42,6 +43,7 @@ class Suplier_Manager(object):
         tk.Button(self, text="save orders", command=lambda: self.filemanager.save_orders_to_file(orders=self.get_orders())).grid()
         tk.Button(self, text="display employers", command=lambda: print(self.get_employers())).grid()
         tk.Button(self, text="display orders", command=lambda: print(self.get_orders())).grid()
+        tk.Button(self, text="display free orders", command=lambda: print(self.get_free_orders())).grid()
        
     def get_orders(self) -> list:
         return list(copy.deepcopy(self.__orders))
@@ -59,6 +61,9 @@ class Suplier_Manager(object):
             if hasattr(listener, "on_orders_changed"):
                 listener.on_orders_changed(orders=self.get_orders())
     
+    def get_free_orders(self) -> list:
+        return [order for order in self.get_orders() if order[3] == FREE_MARK]
+
     def get_employers(self):
         return self.__employers
     
@@ -92,6 +97,18 @@ class Employer(object):
     def set_orders(self, new_orders):
         self.__orders = tuple(copy.deepcopy(new_orders))
         self.on_employer_orders_changed()
+    
+    def on_orders_changed(self, orders):
+        """ Removes orders that absent in NES(orders) """
+
+        orders_numbers = [order[2] for order in orders]
+        clean_orders = self.get_orders()
+
+        for employer_order in self.get_orders():
+            if employer_order not in orders_numbers:
+                clean_orders.remove(employer_order)
+        
+        self.set_orders(new_orders=clean_orders)
 
     def on_employer_orders_changed(self):
         for listener in self.__listeners:
@@ -116,7 +133,7 @@ class Employer(object):
 
     def __repr__(self):
         class_ = str(self.__class__)[:-1]
-        return f"{class_} name={self.name}, orders={self.orders}>'"
+        return f"{class_} name={self.name}, orders={self.get_orders()}>'"
 
 class Suplier_Manager_TopLevel(Suplier_Manager, tk.Toplevel):
     """ Singleton """
@@ -258,7 +275,8 @@ class Extended_Webdriver(webdriver.Chrome):
         WebDriverWait(driver, 5).until_not(EC.text_to_be_present_in_element((By.CLASS_NAME, "table-primary"), table_element.text))
 
     def read_supliers_page_orders(self, table_element) -> list:
-        """ Read supliers 1, 2, 5 columns data. Using search all td elements instead selector because it faster """
+        """ Read supliers 1, 2, 5 columns data. Using search all td elements instead selector because it faster.
+            Mark all orders as free by FREE_MARK """
 
         tbody_element = table_element.find_element(By.CSS_SELECTOR, "tbody")
         rows = len(tbody_element.find_elements(By.CSS_SELECTOR, "tr"))
@@ -272,7 +290,7 @@ class Extended_Webdriver(webdriver.Chrome):
             for col in (0, 1, 4):
                 index = row * COLUMNS + col
                 order.append(td_elements[index].text)
-            orders.append(order + [' ']) # empty field need for employer name 
+            orders.append(order + [FREE_MARK])
 
         return orders
 
