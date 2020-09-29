@@ -30,18 +30,18 @@ class Suplier_Manager(object):
         self.__employers = ()
         self.__listeners = []
 
+        self.set_employers(employers=self.filemanager.get_employers_from_file(file_path=os.path.join(MANAGER_DIR_PATH, "Employers orders.xlsx")))
+        for employer in self.get_employers():
+            self.subscribe(employer)
+        self.set_orders(new_orders=self.filemanager.get_orders_from_file(file_path=os.path.join(MANAGER_DIR_PATH, "Orders.xlsx")))
+        print(self.get_orders())
         self.create_widgets()
 
-        self.set_orders(new_orders=self.filemanager.get_orders_from_file(file_path=os.path.join(MANAGER_DIR_PATH, "Orders.xlsx")))    
-        self.set_employers(employers=self.filemanager.get_employers_from_file(file_path=os.path.join(MANAGER_DIR_PATH, "Employers orders.xlsx")))
-        
     def create_widgets(self):
-        tk.Button(self, text="display orders", command=lambda: print(self.get_orders())).grid()
+        tk.Button(self, text="read supliers table", command=lambda: self.set_orders(new_orders=driver.read_supliers_table())).grid()
+        tk.Button(self, text="save orders", command=lambda: self.filemanager.save_orders_to_file(orders=self.get_orders())).grid()
         tk.Button(self, text="display employers", command=lambda: print(self.get_employers())).grid()
-        # tk.Button(self, text="read supliers table", command=self.read_supliers_table).grid()
-        # tk.Button(self, text="read employers file", command=lambda: self.read_employers_file()).grid()
-        # tk.Button(self, text="read orders file", command=lambda: self.read_orders_file()).grid()
-        # tk.Button(self, text="save file", command=lambda: self.save_orders_to_file(file_path=os.path.join(MANAGER_DIR_PATH, "Orders.xlsx"))).grid()
+        tk.Button(self, text="display orders", command=lambda: print(self.get_orders())).grid()
        
     def get_orders(self) -> list:
         return list(copy.deepcopy(self.__orders))
@@ -51,7 +51,11 @@ class Suplier_Manager(object):
         self.on_orders_changed()
 
     def on_orders_changed(self):
+        """ mark_self_orders must be firts, because it one change orders list """
+
         for listener in self.__listeners:
+            if hasattr(listener, "mark_self_orders"):
+                self.__orders = tuple(listener.mark_self_orders(orders=self.get_orders()))
             if hasattr(listener, "on_orders_changed"):
                 listener.on_orders_changed(orders=self.get_orders())
     
@@ -65,7 +69,7 @@ class Suplier_Manager(object):
     def on_employers_changed(self):
         for listener in self.__listeners:
             if hasattr(listener, "on_employers_changed"):
-                listener.on_employers_changed(orders=self.get_employers())
+                listener.on_employers_changed(employers=self.get_employers())
     
     def subscribe(self, listener):
         self.__listeners.append(listener)        
@@ -79,8 +83,37 @@ class Suplier_Manager(object):
 class Employer(object):
     def __init__(self, name, orders):
         self.name = name
-        self.orders = orders
+        self.__orders = tuple(copy.deepcopy(orders))
+        self.__listeners = []
     
+    def get_orders(self) -> list:
+        return list(copy.deepcopy(self.__orders))
+    
+    def set_orders(self, new_orders):
+        self.__orders = tuple(copy.deepcopy(new_orders))
+        self.on_employer_orders_changed()
+
+    def on_employer_orders_changed(self):
+        for listener in self.__listeners:
+            if hasattr(listener, "on_employer_orders_changed"):
+                listener.on_employer_orders_changed(employer=self)
+    
+    def subscribe(self, listener):
+        self.__listeners.append(listener)
+
+    def mark_self_orders(self, orders) -> list:
+        " Mark self orders by name in given orders list"
+
+        orders_numbers = [order[2] for order in orders]
+
+        for employer_order in self.get_orders():
+            if not employer_order in orders_numbers:
+                continue
+            index = orders_numbers.index(employer_order)
+            orders[index][3] = self.name
+        
+        return orders
+
     def __repr__(self):
         class_ = str(self.__class__)[:-1]
         return f"{class_} name={self.name}, orders={self.orders}>'"
@@ -181,7 +214,7 @@ class Filemanager(object):
                 order.append(col.value)
             
             orders.append(order)
-        
+
         return orders   
 
 class Extended_Webdriver(webdriver.Chrome):
@@ -195,6 +228,10 @@ class Extended_Webdriver(webdriver.Chrome):
         pages = re.search('Page: (\d+) / (\d+)', pages_element.text)
         current_page = int(pages.group(1))
         last_page = int(pages.group(2))
+
+        ###############test###################
+        last_page = 3
+        ###############test###################
 
         if current_page != 1:
             self.goto_nes_table_first_page(table_element=table_element)
@@ -235,7 +272,7 @@ class Extended_Webdriver(webdriver.Chrome):
             for col in (0, 1, 4):
                 index = row * COLUMNS + col
                 order.append(td_elements[index].text)
-            orders.append(order)
+            orders.append(order + [' ']) # empty field need for employer name 
 
         return orders
 
