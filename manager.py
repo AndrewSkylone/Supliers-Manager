@@ -14,36 +14,51 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 import openpyxl
 
+from table import tableGUI
 
-def read_settings(file_path) -> dict:
+
+def read_csv_settings(file_path) -> dict:
+    """ Return dict with key = csv column name, value = csv column value in the 1st row only"""
+
     with open(file_path, 'r', newline='') as csvfile:
         return next(csv.DictReader(csvfile, delimiter=";"))
 
+#Constants
 MANAGER_DIR_PATH = os.path.dirname(__file__)
-settings = read_settings(file_path=os.path.join(MANAGER_DIR_PATH, "settings", "settings.csv"))
+ORDERS_PATH = os.path.join(MANAGER_DIR_PATH, "Orders.xlsx")
+EMPLOYERS_PATH = os.path.join(MANAGER_DIR_PATH, "Employers orders.xlsx")
 FREE_MARK = ' '
+settings = read_csv_settings(file_path=os.path.join(MANAGER_DIR_PATH, "settings", "settings.csv"))
 
 class Suplier_Manager(object):
     def __init__(self, driver):
         self.driver = driver
-        self.filemanager = Filemanager(app=self)
         self.__orders = ()
         self.__employers = ()
         self.__listeners = []
 
-        self.set_employers(employers=self.filemanager.get_employers_from_file(file_path=os.path.join(MANAGER_DIR_PATH, "Employers orders.xlsx")))
-        for employer in self.get_employers():
-            self.subscribe(employer)
-        self.set_orders(new_orders=self.filemanager.get_orders_from_file(file_path=os.path.join(MANAGER_DIR_PATH, "Orders.xlsx")))
+        self.table = None
 
-        self.create_widgets()
+        self.create_widgets()        
+        self.read_files()
 
     def create_widgets(self):
-        tk.Button(self, text="read supliers table", command=lambda: self.set_orders(new_orders=driver.read_supliers_table())).grid()
-        tk.Button(self, text="save orders", command=lambda: self.filemanager.save_orders_to_file(orders=self.get_orders())).grid()
-        tk.Button(self, text="display employers", command=lambda: print(self.get_employers())).grid()
-        tk.Button(self, text="display orders", command=lambda: print(self.get_orders())).grid()
-        tk.Button(self, text="display free orders", command=lambda: print(self.get_free_orders())).grid()
+        self.table = tableGUI.TableGUI(master=self, height=int(settings['table rows']))
+        self.table.grid(row=0, column=0)
+        self.subscribe(self.table)
+
+        save_button = tk.Button(self, text="save files", font=("Calibri", 12), command=self.save_files)
+        save_button.grid(row=1, column=0)
+
+    def save_files(self):
+        filemanager.save_orders_to_file(orders=self.get_orders(), file_path=ORDERS_PATH, save_backup=settings['save backups'])
+        filemanager.save_employers_to_file(employers=self.get_employers(), file_path=EMPLOYERS_PATH)
+    
+    def read_files(self):
+        self.set_employers(employers=filemanager.get_employers_from_file(file_path=EMPLOYERS_PATH))
+        for employer in self.get_employers():
+            self.subscribe(employer)
+        self.set_orders(new_orders=filemanager.get_orders_from_file(file_path=ORDERS_PATH))
        
     def get_orders(self) -> list:
         return list(copy.deepcopy(self.__orders))
@@ -58,6 +73,8 @@ class Suplier_Manager(object):
         for listener in self.__listeners:
             if hasattr(listener, "mark_self_orders"):
                 self.__orders = tuple(listener.mark_self_orders(orders=self.get_orders()))
+                
+        for listener in self.__listeners:
             if hasattr(listener, "on_orders_changed"):
                 listener.on_orders_changed(orders=self.get_orders())
     
@@ -79,11 +96,6 @@ class Suplier_Manager(object):
     def subscribe(self, listener):
         self.__listeners.append(listener)        
        
-    def set_title(self, title="Suplier Manager"):
-        self.title(title=title)
-    
-    def title(self, title):
-        raise NotImplementedError
 
 class Employer(object):
     def __init__(self, name, orders):
@@ -169,14 +181,10 @@ class Suplier_Manager_Frame(Suplier_Manager, tk.Frame):
     def title(self, title):
         self.master.title(title)
 
-class Filemanager(object):
-    def __init__(self, app):
-        self.application = app
-        self.current_file = tk.StringVar()
-        self.current_file.set("Employers orders.xlsx")
-        self.current_file.trace("w", lambda *args: self.application.set_title(title=self.current_file.get()))
+class filemanager(object):
 
-    def save_orders_to_file(self, orders, file_path=os.path.join(MANAGER_DIR_PATH, "Orders.xlsx")):        
+    @staticmethod
+    def save_orders_to_file(orders, file_path, save_backup=False):        
         workbook = openpyxl.Workbook()
         sheet = workbook.active
 
@@ -185,23 +193,26 @@ class Filemanager(object):
 
         workbook.save(filename=file_path)
 
-        if settings.get("save backups", "No") == "Yes":
+        if save_backup == "Yes":
             date = datetime.today().strftime(r"%H.%M %d-%m-%Y")
-            workbook.save(filename=os.path.join(MANAGER_DIR_PATH, 'Backups', f'{date}.xlsx'))
+            dir_path = os.path.dirname(file_path)
+            workbook.save(filename=os.path.join(dir_path, 'Backups', f'{date}.xlsx'))
 
-    def save_employers_to_file(self, employers, file_path=os.path.join(MANAGER_DIR_PATH, "Employers orders.xlsx")):
+    @staticmethod
+    def save_employers_to_file(employers, file_path):
         workbook = openpyxl.Workbook()
         sheet = workbook.active
 
         for col in range(len(employers)):
             sheet.cell(row=1, column=col + 1, value=employers[col].name)
-            for row in range(len(employers[col].orders)):
-                sheet.cell(row=row + 2, column=col + 1, value=employers[col].orders[row])
+            orders = employers[col].get_orders()
+            for row in range(len(orders)):
+                sheet.cell(row=row + 2, column=col + 1, value=orders[row])
 
         workbook.save(file_path)
     
-    def get_employers_from_file(self, file_path=os.path.join(MANAGER_DIR_PATH, "Employers orders.xlsx")) -> list:
-        self.current_file.set(os.path.basename(file_path))
+    @staticmethod
+    def get_employers_from_file(file_path) -> list:
         workbook = openpyxl.load_workbook(filename=file_path)
         sheet = workbook.active
         employers = []
@@ -219,8 +230,8 @@ class Filemanager(object):
         
         return employers
     
-    def get_orders_from_file(self, file_path=os.path.join(MANAGER_DIR_PATH, "Orders.xlsx")):
-        self.current_file.set(os.path.basename(file_path))
+    @staticmethod
+    def get_orders_from_file(file_path):
         workbook = openpyxl.load_workbook(filename=file_path)
         sheet = workbook.active
         orders = []
