@@ -4,12 +4,19 @@ import copy
 import math
 import pyperclip
 import webbrowser
+from enum import Enum
 
+
+NUMBER_INDEX = 0
+DATE_INDEX = 1
+MYXLNUMB_INDEX = 2
+EMPLOYER_INDEX= 3
 
 class TableGUI(tk.Frame):
-    def __init__(self, master, height, cnf={}, **kw):
+    def __init__(self, master, app, height, cnf={}, **kw):
         tk.Frame.__init__(self, master, cnf, **kw)
 
+        self.app = app
         self.table_height = height
         self.__table_orders = ()
         self.table = None
@@ -20,12 +27,23 @@ class TableGUI(tk.Frame):
     
     def create_widgets(self):
         self.table = TreeView(master=self, app=self, height=self.table_height, show="headings")
-        self.table.grid(row=0, column=0)
+        self.table.grid(row=0, column=0, columnspan=2)
 
         self.navigator = Navigator(master=self, app=self)
         self.subscribe(self.navigator)
         self.navigator.subscribe(self.table)
         self.navigator.grid(row=1, column=0, padx=5, pady=5, sticky='w')
+
+        employers_frame = tk.Frame(self)
+        employers_frame.grid(row=1, column=1, padx=5, pady=5, sticky='e'+'w'+'n')
+
+        variable = tk.StringVar()
+        self.employers_menu = tk.OptionMenu(employers_frame, variable, ' ')
+        self.employers_menu.variable = variable
+        self.employers_menu.grid(row=0, column=0, sticky='w' + 'e')
+
+        send_orders_button = tk.Button(employers_frame, text="send orders", command=self.send_orders)
+        send_orders_button.grid(row=0, column=1)
 
     def get_table_orders(self) -> list:
         return list(copy.deepcopy(self.__table_orders))
@@ -36,7 +54,16 @@ class TableGUI(tk.Frame):
         self.on_table_orders_changed(old_orders=old_orders)
 
     def on_orders_changed(self, orders):
-        self.set_table_orders(orders=orders)     
+        self.set_table_orders(orders=orders)
+
+    def on_employers_changed(self, employers):
+        menu = self.employers_menu["menu"]
+        menu.delete(0, "end")
+        employers = [' '] + [emp.name for emp in employers]        
+        for employer in employers:
+            menu.add_command(label=employer,
+                            command=lambda value=employer:self.employers_menu.variable.set(value))
+
 
     def subscribe(self, listener):
         self.__listeners.append(listener)
@@ -57,7 +84,7 @@ class TableGUI(tk.Frame):
             self.date_reverse = False
 
         orders = self.get_table_orders()
-        orders.sort(key = lambda row: (row[1]), reverse=self.date_reverse)
+        orders.sort(key = lambda row: (row[DATE_INDEX]), reverse=self.date_reverse)
 
         self.set_table_orders(orders=orders)
     
@@ -66,10 +93,22 @@ class TableGUI(tk.Frame):
             self.user_reverse = not self.user_reverse
         else:
             self.user_reverse = False
+
         orders = self.get_table_orders()
-        orders.sort(key = lambda row: (row[3], row[1]), reverse=self.user_reverse)
+        orders.sort(key = lambda row: (row[EMPLOYER_INDEX], row[DATE_INDEX]), reverse=self.user_reverse)
 
         self.set_table_orders(orders=orders)
+    
+    def send_orders(self):
+        orders = self.app.get_orders()
+        orders_numbers = [order[MYXLNUMB_INDEX] for order in orders]
+        selected_orders = self.table.get_selected_orders()
+
+        for selected in selected_orders:
+            order_index = orders_numbers.index(selected[MYXLNUMB_INDEX])
+            orders[order_index][EMPLOYER_INDEX] = self.employers_menu.variable.get()
+        
+        self.app.set_orders(orders=orders)
 
 class TreeView(ttk.Treeview):
     def __init__(self, master, app, **kw):
@@ -168,10 +207,10 @@ class Navigator(tk.Frame):
         self.page_entry.grid(row=0, column=2, sticky="w"+"e")
 
         pages_entry = tk.Entry(self, state="readonly", textvariable=self.pages, bd=0, justify="left")
-        pages_entry.grid(row=1, column=0, columnspan=2, pady=4, sticky="w")
+        pages_entry.grid(row=1, column=0, pady=4, sticky="w")
 
         total_entry = tk.Entry(self, state="readonly", textvariable=self.orders_num, bd=0, justify="left")
-        total_entry.grid(row=2, column=0, columnspan=2, sticky="w")
+        total_entry.grid(row=2, column=0, sticky="w")
 
     def goto_page(self, goto_page : str):
         pages = self.get_pages_num()

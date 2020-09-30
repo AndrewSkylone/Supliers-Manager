@@ -43,12 +43,19 @@ class Suplier_Manager(object):
         self.read_files()
 
     def create_widgets(self):
-        self.table = tableGUI.TableGUI(master=self, height=int(settings['table rows']))
+        self.table = tableGUI.TableGUI(master=self, app=self, height=int(settings['table rows']))
         self.table.grid(row=0, column=0)
         self.subscribe(self.table)
 
-        save_button = tk.Button(self, text="save files", font=("Calibri", 12), command=self.save_files)
-        save_button.grid(row=1, column=0)
+        # buttons
+        buttons_frame = tk.Frame(self)
+        buttons_frame.grid(row=1, column=0)
+
+        read_nes_table_button = tk.Button(buttons_frame, text="read NES orders", font=("Calibri", 12), command=self.read_nes_table)
+        read_nes_table_button.grid(row=1, column=0)
+
+        save_button = tk.Button(buttons_frame, text="save files", font=("Calibri", 12), command=self.save_files)
+        save_button.grid(row=1, column=1)
 
     def save_files(self):
         filemanager.save_orders_to_file(orders=self.get_orders(), file_path=ORDERS_PATH, save_backup=settings['save backups'])
@@ -58,25 +65,35 @@ class Suplier_Manager(object):
         self.set_employers(employers=filemanager.get_employers_from_file(file_path=EMPLOYERS_PATH))
         for employer in self.get_employers():
             self.subscribe(employer)
-        self.set_orders(new_orders=filemanager.get_orders_from_file(file_path=ORDERS_PATH))
+        self.set_orders(orders=filemanager.get_orders_from_file(file_path=ORDERS_PATH))
+    
+    def read_nes_table(self):
+        nes_orders = self.driver.read_supliers_table()
+        marked_orders = self.mark_orders_by_employers(orders=nes_orders)
+
+        self.set_orders(orders=marked_orders)
        
     def get_orders(self) -> list:
         return list(copy.deepcopy(self.__orders))
     
-    def set_orders(self, new_orders):
-        self.__orders = tuple(copy.deepcopy(new_orders))
+    def set_orders(self, orders):
+        self.__orders = tuple(copy.deepcopy(orders))
         self.on_orders_changed()
 
-    def on_orders_changed(self):
-        """ mark_self_orders must be firts, because it one change orders list """
-
-        for listener in self.__listeners:
-            if hasattr(listener, "mark_self_orders"):
-                self.__orders = tuple(listener.mark_self_orders(orders=self.get_orders()))
-                
+    def on_orders_changed(self):                
         for listener in self.__listeners:
             if hasattr(listener, "on_orders_changed"):
                 listener.on_orders_changed(orders=self.get_orders())
+    
+    def mark_orders_by_employers(self, orders) -> list:
+        """ Marks orders by name of the employers who have this orders """
+
+        marked = copy.deepcopy(orders)
+
+        for employer in self.get_employers():
+            employer.mark_self_orders(orders=orders)
+
+        return marked
     
     def get_free_orders(self) -> list:
         return [order for order in self.get_orders() if order[3] == FREE_MARK]
@@ -94,8 +111,7 @@ class Suplier_Manager(object):
                 listener.on_employers_changed(employers=self.get_employers())
     
     def subscribe(self, listener):
-        self.__listeners.append(listener)        
-       
+        self.__listeners.append(listener)               
 
 class Employer(object):
     def __init__(self, name, orders):
@@ -106,21 +122,22 @@ class Employer(object):
     def get_orders(self) -> list:
         return list(copy.deepcopy(self.__orders))
     
-    def set_orders(self, new_orders):
-        self.__orders = tuple(copy.deepcopy(new_orders))
+    def set_orders(self, orders):
+        self.__orders = tuple(copy.deepcopy(orders))
         self.on_employer_orders_changed()
     
     def on_orders_changed(self, orders):
-        """ Removes orders that absent in NES(orders) """
+        """ Removes orders that absent in NES(orders) or not belong this user anymore """
 
         orders_numbers = [order[2] for order in orders]
         clean_orders = self.get_orders()
 
         for employer_order in self.get_orders():
-            if employer_order not in orders_numbers:
+            order_index = orders_numbers.index(employer_order)
+            if employer_order not in orders_numbers or orders[order_index][3] != self.name:
                 clean_orders.remove(employer_order)
         
-        self.set_orders(new_orders=clean_orders)
+        self.set_orders(orders=clean_orders)
 
     def on_employer_orders_changed(self):
         for listener in self.__listeners:
@@ -130,7 +147,7 @@ class Employer(object):
     def subscribe(self, listener):
         self.__listeners.append(listener)
 
-    def mark_self_orders(self, orders) -> list:
+    def mark_self_orders(self, orders):
         " Mark self orders by name in given orders list"
 
         orders_numbers = [order[2] for order in orders]
@@ -140,8 +157,6 @@ class Employer(object):
                 continue
             index = orders_numbers.index(employer_order)
             orders[index][3] = self.name
-        
-        return orders
 
     def __repr__(self):
         class_ = str(self.__class__)[:-1]
@@ -298,7 +313,7 @@ class Extended_Webdriver(webdriver.Chrome):
 
         for row in range(rows):
             order = []
-            for col in (0, 1, 4):
+            for col in (0, 2, 4):
                 index = row * COLUMNS + col
                 order.append(td_elements[index].text)
             orders.append(order + [FREE_MARK])

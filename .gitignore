@@ -1,0 +1,7 @@
+chromedriver
+__pycache__
+Backups
+logs
+*.log
+test.py
+*.txt
