@@ -21,26 +21,9 @@ def save_orders_to_file(orders, file_path, save_backup=False):
     workbook.save(filename=file_path)
 
     if save_backup == "Yes":
-        date = datetime.today().date()
+        date = datetime.today().strftime(r"%H.%M %d-%m-%Y")
         dir_path = os.path.dirname(file_path)
         workbook.save(filename=os.path.join(dir_path, 'Backups', f'{date}.xlsx'))
-
-def __save_employers_data_to_table(employers_data : dict, table_path):
-    workbook = openpyxl.load_workbook(table_path)
-    if not 'Employers' in workbook.sheetnames:
-        workbook.create_sheet(title='Employers')
-    sheet = workbook['Employers']
-
-    for col, name in enumerate(employers_data):
-        sheet.cell(row=1, column=col + 1, value=name)
-
-        orders = employers_data[name]
-        for row in range(len(orders)):
-            sheet.cell(row=row + 2, column=col + 1, value=orders[row][0])
-            sheet.cell(row=row + 2, column=col + 2, value=orders[row][1])
-
-    adjust_sheet_cells(sheet=sheet)
-    workbook.save(table_path)
 
 def save_employers_data_to_table(employers_data : dict, table_path):
     workbook = openpyxl.load_workbook(table_path)
@@ -60,6 +43,7 @@ def save_employers_data_to_table(employers_data : dict, table_path):
     
     for col in range(len(employers_data)):
         sheet.merge_cells(start_row=1, start_column=col * 2 + 1, end_row=1, end_column=col * 2 + 2)
+        sheet.cell(row=1, column=col * 2 + 1).alignment = Alignment(horizontal='center')
         
     workbook.save(table_path)
 

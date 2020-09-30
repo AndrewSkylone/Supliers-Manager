@@ -7,9 +7,9 @@ import webbrowser
 from enum import Enum
 
 
-NUMBER_INDEX = 0
+MYXLNUMB_INDEX = 0
 DATE_INDEX = 1
-MYXLNUMB_INDEX = 2
+NUMBER_INDEX = 2
 EMPLOYER_INDEX= 3
 
 class TableGUI(tk.Frame):
@@ -39,11 +39,12 @@ class TableGUI(tk.Frame):
 
         variable = tk.StringVar()
         self.employers_menu = tk.OptionMenu(employers_frame, variable, ' ')
+        self.employers_menu.config(font=('Arial', 13), width=16)
         self.employers_menu.variable = variable
         self.employers_menu.grid(row=0, column=0, sticky='w' + 'e')
 
-        send_orders_button = tk.Button(employers_frame, text="send orders", command=self.send_orders)
-        send_orders_button.grid(row=0, column=1)
+        send_orders_button = tk.Button(employers_frame, text="send orders", font=('Arial', 12), command=self.send_orders)
+        send_orders_button.grid(row=1, column=0, sticky='w' + 'e')
 
     def get_table_orders(self) -> list:
         return list(copy.deepcopy(self.__table_orders))
@@ -59,11 +60,10 @@ class TableGUI(tk.Frame):
     def on_employers_changed(self, employers):
         menu = self.employers_menu["menu"]
         menu.delete(0, "end")
-        employers = [' '] + [emp.name for emp in employers]        
+        employers = [' '] + [employer for employer in employers]        
         for employer in employers:
             menu.add_command(label=employer,
                             command=lambda value=employer:self.employers_menu.variable.set(value))
-
 
     def subscribe(self, listener):
         self.__listeners.append(listener)
@@ -78,24 +78,14 @@ class TableGUI(tk.Frame):
             listener.on_table_orders_changed(orders=self.get_table_orders())
     
     def sort_orders_by_date(self):
-        if hasattr(self, 'date_reverse'):
-            self.date_reverse = not self.date_reverse
-        else:
-            self.date_reverse = False
-
         orders = self.get_table_orders()
-        orders.sort(key = lambda row: (row[DATE_INDEX]), reverse=self.date_reverse)
+        orders.sort(key = lambda row: (row[DATE_INDEX]))
 
         self.set_table_orders(orders=orders)
     
     def sort_orders_by_user(self):
-        if hasattr(self, 'user_reverse'):
-            self.user_reverse = not self.user_reverse
-        else:
-            self.user_reverse = False
-
         orders = self.get_table_orders()
-        orders.sort(key = lambda row: (row[EMPLOYER_INDEX], row[DATE_INDEX]), reverse=self.user_reverse)
+        orders.sort(key = lambda row: (row[EMPLOYER_INDEX], row[DATE_INDEX]))
 
         self.set_table_orders(orders=orders)
     
@@ -118,14 +108,14 @@ class TreeView(ttk.Treeview):
         self.app = app
 
         self["columns"] = (0, 1, 2, 3)
-        self.column(0, width=100)
-        self.column(1, width=180)
-        self.column(2, width=180)
+        self.column(0, width=180)
+        self.column(1, width=110)
+        self.column(2, width=100)
         self.column(3, width=150)
 
-        self.heading(0, text="№")
+        self.heading(0, text="MYXL number")
         self.heading(1, text="Creation date", command=self.app.sort_orders_by_date)
-        self.heading(2, text="MYXL number")
+        self.heading(2, text="№")
         self.heading(3, text="User", command=self.app.sort_orders_by_user)
 
         for i in range(self.rows):
@@ -156,7 +146,7 @@ class TreeView(ttk.Treeview):
         selected = self.selection()
         for iid in selected:
             item = self.item(iid)
-            order_number = item["values"][0]
+            order_number = item["values"][NUMBER_INDEX]
             webbrowser.open_new_tab(f"https://nesky.hktemas.com/orders/{order_number}")
             self.selection_toggle(iid)
     
@@ -176,9 +166,15 @@ class TreeView(ttk.Treeview):
         self.selection_toggle(row)
 
     def copy_value(self, event):
-        column = int(self.identify_column(self.click_posx)[1:]) - 1
-        item = self.item(self.selection()[0])
-        pyperclip.copy(item["values"][column])
+        selected_orders = self.get_selected_orders()
+        result = ''
+
+        for order in selected_orders:
+            for col in (MYXLNUMB_INDEX, DATE_INDEX):
+                result += str(order[col]) + '\t'
+            result += '\n' 
+        
+        pyperclip.copy(result)
     
 class Navigator(tk.Frame):
     def __init__(self, master, app, cnf={}, **kw):
@@ -207,10 +203,10 @@ class Navigator(tk.Frame):
         self.page_entry.grid(row=0, column=2, sticky="w"+"e")
 
         pages_entry = tk.Entry(self, state="readonly", textvariable=self.pages, bd=0, justify="left")
-        pages_entry.grid(row=1, column=0, pady=4, sticky="w")
+        pages_entry.grid(row=1, column=0, columnspan=2, pady=4, sticky="w")
 
         total_entry = tk.Entry(self, state="readonly", textvariable=self.orders_num, bd=0, justify="left")
-        total_entry.grid(row=2, column=0, sticky="w")
+        total_entry.grid(row=2, column=0, columnspan=2, sticky="w")
 
     def goto_page(self, goto_page : str):
         pages = self.get_pages_num()

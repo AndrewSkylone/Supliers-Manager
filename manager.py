@@ -15,32 +15,28 @@ from selenium.webdriver.support.ui import WebDriverWait
 import openpyxl
 
 from table import tableGUI
+from filemanager import filemanager
 
-
-def read_csv_settings(file_path) -> dict:
-    """ Return dict with key = csv column name, value = csv column value in the 1st row only"""
-
-    with open(file_path, 'r', newline='') as csvfile:
-        return next(csv.DictReader(csvfile, delimiter=";"))
 
 #Constants
 MANAGER_DIR_PATH = os.path.dirname(__file__)
+EMPLOYERS_PATH = os.path.join(MANAGER_DIR_PATH, 'employers.txt')
 ORDERS_PATH = os.path.join(MANAGER_DIR_PATH, "Orders.xlsx")
-EMPLOYERS_PATH = os.path.join(MANAGER_DIR_PATH, "Employers orders.xlsx")
 FREE_MARK = ' '
-settings = read_csv_settings(file_path=os.path.join(MANAGER_DIR_PATH, "settings", "settings.csv"))
+settings = filemanager.read_csv_settings(file_path=os.path.join(MANAGER_DIR_PATH, "settings", "settings.csv"))
 
 class Suplier_Manager(object):
     def __init__(self, driver):
         self.driver = driver
+        self.table = None
         self.__orders = ()
         self.__employers = ()
         self.__listeners = []
 
-        self.table = None
+        self.create_widgets()
 
-        self.create_widgets()        
-        self.read_files()
+        self.set_orders(orders=filemanager.get_orders_from_file(file_path=ORDERS_PATH))
+        self.set_employers(employers=filemanager.get_employers_from_file(file_path=EMPLOYERS_PATH))
 
     def create_widgets(self):
         self.table = tableGUI.TableGUI(master=self, app=self, height=int(settings['table rows']))
@@ -54,24 +50,19 @@ class Suplier_Manager(object):
         read_nes_table_button = tk.Button(buttons_frame, text="read NES orders", font=("Calibri", 12), command=self.read_nes_table)
         read_nes_table_button.grid(row=1, column=0)
 
-        save_button = tk.Button(buttons_frame, text="save files", font=("Calibri", 12), command=self.save_files)
+        save_button = tk.Button(buttons_frame, text="save file", font=("Calibri", 12), command=self.save_file)
         save_button.grid(row=1, column=1)
 
-    def save_files(self):
-        filemanager.save_orders_to_file(orders=self.get_orders(), file_path=ORDERS_PATH, save_backup=settings['save backups'])
-        filemanager.save_employers_to_file(employers=self.get_employers(), file_path=EMPLOYERS_PATH)
-    
-    def read_files(self):
-        self.set_employers(employers=filemanager.get_employers_from_file(file_path=EMPLOYERS_PATH))
-        for employer in self.get_employers():
-            self.subscribe(employer)
-        self.set_orders(orders=filemanager.get_orders_from_file(file_path=ORDERS_PATH))
+    def save_file(self, file_path=ORDERS_PATH):
+        filemanager.save_orders_to_file(orders=self.get_orders(), file_path=file_path, save_backup=settings['save backups'])
+        filemanager.save_employers_data_to_table(employers_data=self.get_employers_data(), table_path=ORDERS_PATH)        
     
     def read_nes_table(self):
         nes_orders = self.driver.read_supliers_table()
-        marked_orders = self.mark_orders_by_employers(orders=nes_orders)
+        # marked_orders = self.mark_orders_by_employers(orders=nes_orders)
 
-        self.set_orders(orders=marked_orders)
+        # self.set_orders(orders=marked_orders)
+        self.set_orders(orders=nes_orders)
        
     def get_orders(self) -> list:
         return list(copy.deepcopy(self.__orders))
@@ -98,10 +89,28 @@ class Suplier_Manager(object):
     def get_free_orders(self) -> list:
         return [order for order in self.get_orders() if order[3] == FREE_MARK]
 
-    def get_employers(self):
-        return self.__employers
+    def get_employer_orders(self, employer) -> list:
+        employer_orders = []
+        for order in self.get_orders():
+            if order[3] == employer:
+                employer_orders.append(order)
+        
+        return employer_orders
     
-    def set_employers(self, employers:list):
+    def get_employers_data(self) -> dict:
+        employers = self.get_employers()
+        orders = self.get_orders()
+        employers_data = {}
+
+        for employer in employers:
+            employers_data[employer] = self.get_employer_orders(employer=employer)
+
+        return employers_data        
+
+    def get_employers(self) -> list:
+        return list(copy.deepcopy(self.__employers))
+    
+    def set_employers(self, employers : list):
         self.__employers = tuple(employers)
         self.on_employers_changed()
     
@@ -112,55 +121,6 @@ class Suplier_Manager(object):
     
     def subscribe(self, listener):
         self.__listeners.append(listener)               
-
-class Employer(object):
-    def __init__(self, name, orders):
-        self.name = name
-        self.__orders = tuple(copy.deepcopy(orders))
-        self.__listeners = []
-    
-    def get_orders(self) -> list:
-        return list(copy.deepcopy(self.__orders))
-    
-    def set_orders(self, orders):
-        self.__orders = tuple(copy.deepcopy(orders))
-        self.on_employer_orders_changed()
-    
-    def on_orders_changed(self, orders):
-        """ Removes orders that absent in NES(orders) or not belong this user anymore """
-
-        orders_numbers = [order[2] for order in orders]
-        clean_orders = self.get_orders()
-
-        for employer_order in self.get_orders():
-            order_index = orders_numbers.index(employer_order)
-            if employer_order not in orders_numbers or orders[order_index][3] != self.name:
-                clean_orders.remove(employer_order)
-        
-        self.set_orders(orders=clean_orders)
-
-    def on_employer_orders_changed(self):
-        for listener in self.__listeners:
-            if hasattr(listener, "on_employer_orders_changed"):
-                listener.on_employer_orders_changed(employer=self)
-    
-    def subscribe(self, listener):
-        self.__listeners.append(listener)
-
-    def mark_self_orders(self, orders):
-        " Mark self orders by name in given orders list"
-
-        orders_numbers = [order[2] for order in orders]
-
-        for employer_order in self.get_orders():
-            if not employer_order in orders_numbers:
-                continue
-            index = orders_numbers.index(employer_order)
-            orders[index][3] = self.name
-
-    def __repr__(self):
-        class_ = str(self.__class__)[:-1]
-        return f"{class_} name={self.name}, orders={self.get_orders()}>'"
 
 class Suplier_Manager_TopLevel(Suplier_Manager, tk.Toplevel):
     """ Singleton """
@@ -195,70 +155,6 @@ class Suplier_Manager_Frame(Suplier_Manager, tk.Frame):
    
     def title(self, title):
         self.master.title(title)
-
-class filemanager(object):
-
-    @staticmethod
-    def save_orders_to_file(orders, file_path, save_backup=False):        
-        workbook = openpyxl.Workbook()
-        sheet = workbook.active
-
-        for row in orders:
-            sheet.append(row)
-
-        workbook.save(filename=file_path)
-
-        if save_backup == "Yes":
-            date = datetime.today().strftime(r"%H.%M %d-%m-%Y")
-            dir_path = os.path.dirname(file_path)
-            workbook.save(filename=os.path.join(dir_path, 'Backups', f'{date}.xlsx'))
-
-    @staticmethod
-    def save_employers_to_file(employers, file_path):
-        workbook = openpyxl.Workbook()
-        sheet = workbook.active
-
-        for col in range(len(employers)):
-            sheet.cell(row=1, column=col + 1, value=employers[col].name)
-            orders = employers[col].get_orders()
-            for row in range(len(orders)):
-                sheet.cell(row=row + 2, column=col + 1, value=orders[row])
-
-        workbook.save(file_path)
-    
-    @staticmethod
-    def get_employers_from_file(file_path) -> list:
-        workbook = openpyxl.load_workbook(filename=file_path)
-        sheet = workbook.active
-        employers = []
-
-        for column in sheet.columns:
-            employer_name = column[0].value
-
-            employer_orders = []
-            for cell in column[1:]:
-                if not cell.value:
-                    break
-                employer_orders.append(cell.value) 
-
-            employers.append(Employer(name=employer_name, orders=employer_orders))
-        
-        return employers
-    
-    @staticmethod
-    def get_orders_from_file(file_path):
-        workbook = openpyxl.load_workbook(filename=file_path)
-        sheet = workbook.active
-        orders = []
-
-        for row in sheet.rows:
-            order = []
-            for col in row:
-                order.append(col.value)
-            
-            orders.append(order)
-
-        return orders   
 
 class Extended_Webdriver(webdriver.Chrome):
     def __init__(self, executable_path="chromedriver", port=0, options=None, service_args=None, desired_capabilities=None, service_log_path=None, chrome_options=None, keep_alive=True):
@@ -301,7 +197,7 @@ class Extended_Webdriver(webdriver.Chrome):
         WebDriverWait(driver, 5).until_not(EC.text_to_be_present_in_element((By.CLASS_NAME, "table-primary"), table_element.text))
 
     def read_supliers_page_orders(self, table_element) -> list:
-        """ Read supliers 1, 2, 5 columns data. Using search all td elements instead selector because it faster.
+        """ Read supliers 4, 2, 0 columns data. Using search all td elements instead selector because it faster.
             Mark all orders as free by FREE_MARK """
 
         tbody_element = table_element.find_element(By.CSS_SELECTOR, "tbody")
@@ -313,9 +209,12 @@ class Extended_Webdriver(webdriver.Chrome):
 
         for row in range(rows):
             order = []
-            for col in (0, 2, 4):
-                index = row * COLUMNS + col
-                order.append(td_elements[index].text)
+            # for col in (4, 2, 0):
+            #     index = row * COLUMNS + col
+            #     order.append(td_elements[index].text)
+            order.append(td_elements[row * COLUMNS + 4].text)
+            order.append(td_elements[row * COLUMNS + 2].text.split(' ')[0])
+            order.append(td_elements[row * COLUMNS + 0].text)
             orders.append(order + [FREE_MARK])
 
         return orders
