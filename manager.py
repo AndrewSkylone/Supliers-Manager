@@ -18,11 +18,15 @@ from table import tableGUI
 from filemanager import filemanager
 
 
-#Constants
+MYXLNUMB_INDEX = 0
+DATE_INDEX = 1
+NUMBER_INDEX = 2
+EMPLOYER_INDEX = 3
 MANAGER_DIR_PATH = os.path.dirname(__file__)
 EMPLOYERS_PATH = os.path.join(MANAGER_DIR_PATH, 'employers.txt')
 ORDERS_PATH = os.path.join(MANAGER_DIR_PATH, "Orders.xlsx")
 FREE_MARK = ' '
+
 settings = filemanager.read_csv_settings(file_path=os.path.join(MANAGER_DIR_PATH, "settings", "settings.csv"))
 
 class Suplier_Manager(object):
@@ -45,7 +49,7 @@ class Suplier_Manager(object):
 
         # buttons
         buttons_frame = tk.Frame(self)
-        buttons_frame.grid(row=1, column=0)
+        buttons_frame.grid(row=1, column=0, sticky='w')
 
         read_nes_table_button = tk.Button(buttons_frame, text="read NES orders", font=("Calibri", 12), command=self.read_nes_table)
         read_nes_table_button.grid(row=1, column=0)
@@ -57,12 +61,16 @@ class Suplier_Manager(object):
         filemanager.save_orders_to_file(orders=self.get_orders(), file_path=file_path, save_backup=settings['save backups'])
         filemanager.save_employers_data_to_table(employers_data=self.get_employers_data(), table_path=ORDERS_PATH)        
     
-    def read_nes_table(self):
+    def __read_nes_table(self):
         nes_orders = self.driver.read_supliers_table()
-        # marked_orders = self.mark_orders_by_employers(orders=nes_orders)
+        marked_orders = self.mark_orders_by_employers(marked_orders=self.get_orders(), clear_orders=nes_orders)
 
-        # self.set_orders(orders=marked_orders)
-        self.set_orders(orders=nes_orders)
+        self.set_orders(orders=marked_orders)
+    def read_nes_table(self):
+        nes_orders = filemanager.get_orders_from_file(file_path=os.path.join(MANAGER_DIR_PATH, "NES orders.xlsx"))
+        marked_orders = self.mark_orders_by_employers(marked_orders=self.get_orders(), clear_orders=nes_orders)
+
+        self.set_orders(orders=marked_orders)
        
     def get_orders(self) -> list:
         return list(copy.deepcopy(self.__orders))
@@ -76,15 +84,18 @@ class Suplier_Manager(object):
             if hasattr(listener, "on_orders_changed"):
                 listener.on_orders_changed(orders=self.get_orders())
     
-    def mark_orders_by_employers(self, orders) -> list:
+    def mark_orders_by_employers(self, marked_orders, clear_orders) -> list:
         """ Marks orders by name of the employers who have this orders """
 
-        marked = copy.deepcopy(orders)
+        clear_orders = copy.deepcopy(clear_orders)
 
-        for employer in self.get_employers():
-            employer.mark_self_orders(orders=orders)
+        for marked in marked_orders:
+            for clear in clear_orders:
+                if marked[MYXLNUMB_INDEX] == clear[MYXLNUMB_INDEX]:
+                    clear[EMPLOYER_INDEX] = marked[EMPLOYER_INDEX]
+                    break
 
-        return marked
+        return clear_orders
     
     def get_free_orders(self) -> list:
         return [order for order in self.get_orders() if order[3] == FREE_MARK]
@@ -197,7 +208,7 @@ class Extended_Webdriver(webdriver.Chrome):
         WebDriverWait(driver, 5).until_not(EC.text_to_be_present_in_element((By.CLASS_NAME, "table-primary"), table_element.text))
 
     def read_supliers_page_orders(self, table_element) -> list:
-        """ Read supliers 4, 2, 0 columns data. Using search all td elements instead selector because it faster.
+        """ Read supliers MYXLnumber, update date, number columns data. Using search all td elements instead selector because it faster.
             Mark all orders as free by FREE_MARK """
 
         tbody_element = table_element.find_element(By.CSS_SELECTOR, "tbody")
@@ -209,9 +220,6 @@ class Extended_Webdriver(webdriver.Chrome):
 
         for row in range(rows):
             order = []
-            # for col in (4, 2, 0):
-            #     index = row * COLUMNS + col
-            #     order.append(td_elements[index].text)
             order.append(td_elements[row * COLUMNS + 4].text)
             order.append(td_elements[row * COLUMNS + 2].text.split(' ')[0])
             order.append(td_elements[row * COLUMNS + 0].text)
