@@ -61,13 +61,8 @@ class Suplier_Manager(object):
         filemanager.save_orders_to_file(orders=self.get_orders(), file_path=file_path, save_backup=settings['save backups'])
         filemanager.save_employers_data_to_table(employers_data=self.get_employers_data(), table_path=ORDERS_PATH)        
     
-    def __read_nes_table(self):
-        nes_orders = self.driver.read_supliers_table()
-        marked_orders = self.mark_orders_by_employers(marked_orders=self.get_orders(), clear_orders=nes_orders)
-
-        self.set_orders(orders=marked_orders)
     def read_nes_table(self):
-        nes_orders = filemanager.get_orders_from_file(file_path=os.path.join(MANAGER_DIR_PATH, "NES orders.xlsx"))
+        nes_orders = self.driver.read_supliers_table()
         marked_orders = self.mark_orders_by_employers(marked_orders=self.get_orders(), clear_orders=nes_orders)
 
         self.set_orders(orders=marked_orders)
@@ -180,7 +175,7 @@ class Extended_Webdriver(webdriver.Chrome):
         last_page = int(pages.group(2))
 
         ###############test###################
-        last_page = 3
+        # last_page = 3
         ###############test###################
 
         if current_page != 1:
@@ -249,10 +244,10 @@ if __name__ == "__main__":
     root = tk.Tk()
 
     driver = None
-    # root.protocol("WM_DELETE_WINDOW", on_closing)    
+    root.protocol("WM_DELETE_WINDOW", on_closing)    
 
-    # driver = create_profile_chrome_driver()
-    # driver.get("https://nesky.hktemas.com/no-suppliers")
+    driver = create_profile_chrome_driver()
+    driver.get("https://nesky.hktemas.com/no-suppliers")
     
     frame = Suplier_Manager_Frame(root, driver=driver)
     frame.grid()    

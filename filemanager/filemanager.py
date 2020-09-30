@@ -4,6 +4,8 @@ from datetime import datetime
 import csv
 from openpyxl.styles import Alignment
 
+FREE_MARK = ' '
+
 def read_csv_settings(file_path) -> dict:
     """ Return dict with key = csv column name, value = csv column value in the 1st row only"""
 
@@ -60,7 +62,7 @@ def get_orders_from_file(file_path):
         order = []
         for col in range(1, 5):
             cell = sheet.cell(row=row + 1, column=col)
-            order.append(cell.value if cell.value else ' ')
+            order.append(cell.value if cell.value else FREE_MARK)
 
         orders.append(order)
 
