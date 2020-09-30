@@ -17,6 +17,7 @@ def save_orders_to_file(orders, file_path, save_backup=False):
     for row in orders:
         sheet.append(row)
 
+    adjust_sheet_cells(sheet=sheet)
     workbook.save(filename=file_path)
 
     if save_backup == "Yes":
@@ -24,7 +25,7 @@ def save_orders_to_file(orders, file_path, save_backup=False):
         dir_path = os.path.dirname(file_path)
         workbook.save(filename=os.path.join(dir_path, 'Backups', f'{date}.xlsx'))
 
-def save_employers_data_to_table(employers_data : dict, table_path):
+def __save_employers_data_to_table(employers_data : dict, table_path):
     workbook = openpyxl.load_workbook(table_path)
     if not 'Employers' in workbook.sheetnames:
         workbook.create_sheet(title='Employers')
@@ -35,9 +36,31 @@ def save_employers_data_to_table(employers_data : dict, table_path):
 
         orders = employers_data[name]
         for row in range(len(orders)):
-            sheet.cell(row=row + 2, column=col + 1, value=orders[row][col])
+            sheet.cell(row=row + 2, column=col + 1, value=orders[row][0])
+            sheet.cell(row=row + 2, column=col + 2, value=orders[row][1])
 
     adjust_sheet_cells(sheet=sheet)
+    workbook.save(table_path)
+
+def save_employers_data_to_table(employers_data : dict, table_path):
+    workbook = openpyxl.load_workbook(table_path)
+    if not 'Employers' in workbook.sheetnames:
+        workbook.create_sheet(title='Employers')
+    sheet = workbook['Employers']
+
+    for col, name in enumerate(employers_data):
+        sheet.cell(row=1, column=col * 2 + 1, value=name)
+
+        orders = employers_data[name]
+        for row in range(len(orders)):
+            sheet.cell(row=row + 2, column=col * 2 + 1, value=orders[row][0])
+            sheet.cell(row=row + 2, column=col * 2 + 2, value=orders[row][1])
+
+    adjust_sheet_cells(sheet=sheet)
+    
+    for col in range(len(employers_data)):
+        sheet.merge_cells(start_row=1, start_column=col * 2 + 1, end_row=1, end_column=col * 2 + 2)
+        
     workbook.save(table_path)
 
 def get_employers_from_file(file_path) -> list:
@@ -60,9 +83,8 @@ def get_orders_from_file(file_path):
     return orders
 
 def adjust_sheet_cells(sheet):
-    max_width = 0
-
     for col in sheet.columns:
+        max_width = 10
         for cell in col:
             if len(str(cell.value)) > max_width:
                 max_width = len(str(cell.value))
