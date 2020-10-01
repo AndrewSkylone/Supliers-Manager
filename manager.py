@@ -40,7 +40,7 @@ class Suplier_Manager(object):
         self.create_widgets()
 
         self.set_orders(orders=filemanager.get_orders_from_file(file_path=ORDERS_PATH))
-        self.set_employers(employers=filemanager.get_employers_from_file(file_path=EMPLOYERS_PATH))
+        self.set_employers(employers=settings['employers'])
 
     def create_widgets(self):
         self.table = tableGUI.TableGUI(master=self, app=self, height=int(settings['table rows']))

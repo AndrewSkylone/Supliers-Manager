@@ -7,10 +7,23 @@ from openpyxl.styles import Alignment
 FREE_MARK = ' '
 
 def read_csv_settings(file_path) -> dict:
-    """ Return dict with key = csv column name, value = csv column value in the 1st row only"""
 
+    settings = {}
     with open(file_path, 'r', newline='') as csvfile:
-        return next(csv.DictReader(csvfile, delimiter=";"))
+        reader = csv.DictReader(csvfile, delimiter=";")
+        settings = {k:[v] for k, v in next(reader).items()}
+            
+        for row in reader:
+            for header in settings:
+                if row[header]:
+                    settings[header] += [row[header]]
+
+    # change {key : [one value]} to {key : one value}
+    for header in settings:
+        if len(settings[header]) <= 1:
+            settings[header] = settings[header][0]       
+    
+    return settings
 
 def save_orders_to_file(orders, file_path, save_backup=False):        
     workbook = openpyxl.Workbook()
@@ -76,3 +89,7 @@ def adjust_sheet_cells(sheet):
                 max_width = len(str(cell.value))
 
         sheet.column_dimensions[col[0].column_letter].width = max_width * 1.2
+
+
+if __name__ == "__main__":
+    print(read_csv_settings('D:\Програмування\Projects\Suplier Manager\settings\settings.csv'))
