@@ -1,6 +1,9 @@
 import tkinter as tk
 import copy
 
+FREE_MARK = ' '
+EMPLOYER_INDEX = 3
+
 class FilterGui(tk.Menu):
     def __init__(self, master=None, cnf={}, **kw):
         tk.Menu.__init__(self, master, cnf=cnf, **kw)
@@ -11,11 +14,12 @@ class FilterGui(tk.Menu):
         self.vars = {'All' : tk.StringVar(), 'Free' : tk.StringVar()}
 
         self.create_widgets()
+        self.display_all()
 
     def create_widgets(self):
         for label in self.vars:
-            self.add_checkbutton(label=label, variable=self.vars[label], onvalue=label, offvalue=False,
-                                command=lambda label=label: self.on_checkbutton_pressed(label=label))
+            self.add_checkbutton(label=label, variable=self.vars[label], onvalue=label, offvalue='',
+                                command=lambda label=label: self.on_checkbox_click(label=label))
         self.add_separator()
 
     def on_orders_changed(self, orders):
@@ -37,21 +41,51 @@ class FilterGui(tk.Menu):
             self.vars.update({employer : tk.StringVar()})
         
         for label in self.vars:
-            raise NotImplementedError
+            pass
     
     def subscribe(self, listener):
         self.__listeners.append(listener)
     
     def filter_orders(self, orders):
-        raise NotImplementedError
+        return orders
 
     def on_filter_orders_changed(self):
         for listener in self.__listeners:
             if hasattr(listener, "on_filter_orders_changed"):
                 listener.on_filter_orders_changed(orders=self.get_filter_orders())
     
-    def on_checkbutton_pressed(self, label):
-        orders = self.get_filter_orders()
+    def on_checkbox_click(self, label):
+        vars_ = self.vars
 
-        print(self.vars[label].get())
+        if vars_[label].get():
+            if label == 'All':
+                self.display_all()
+            elif label == 'Free':
+                self.display_free()
+            else:
+                
+
+        elif not vars_[label].get():
+            if label == 'All':
+                self.remove_all()
+            elif label == 'Free':
+                self.remove_free()
+        
+    def display_all(self):
+        for label in self.vars:
+            self.vars[label].set(label)
+        self.set_filter_orders(orders=self.get_backup_orders())
+    
+    def remove_all(self):
+        for label in self.vars:
+            self.vars[label].set('')
+        self.set_filter_orders(orders=[])    
+    
+    def remove_free(self):
+        not_free = [order for order in self.get_filter_orders() if order[EMPLOYER_INDEX] != FREE_MARK]
+        self.set_filter_orders(orders=not_free)
+
+    def display_free(self):
+        free = [order for order in self.get_filter_orders() if order[EMPLOYER_INDEX] == FREE_MARK]
+        self.set_filter_orders(orders=free)
     
