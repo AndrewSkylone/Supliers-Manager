@@ -10,7 +10,7 @@ class Settings_Gui():
     def __init__(self):
         self.settings = read_csv_settings(file_path=SETTINGS_PATH)
 
-        write_csv_settings(settings=self.settings, file_path=TEST_SETTINGS_PATH)
+        # write_csv_settings(settings=self.settings, file_path=TEST_SETTINGS_PATH)
         self.create_widgets()
     
     def create_widgets(self):

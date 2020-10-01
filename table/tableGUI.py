@@ -18,7 +18,7 @@ class TableGUI(tk.Frame):
 
         self.app = app
         self.table_height = height
-        self.__table_orders = ()
+        self.__table_orders = []
         self.table = TreeView(master=self, app=self, height=self.table_height, show="headings")
         self.navigator = Navigator(master=self, app=self)
         self.__listeners = []
@@ -45,15 +45,15 @@ class TableGUI(tk.Frame):
         send_orders_button.grid(row=1, column=0, sticky='w' + 'e')
 
     def get_table_orders(self) -> list:
-        return list(copy.deepcopy(self.__table_orders))
+        return copy.deepcopy(self.__table_orders)
     
     def set_table_orders(self, orders):
         old_orders = self.get_table_orders()
-        self.__table_orders = tuple(copy.deepcopy(orders))
+        self.__table_orders = copy.deepcopy(orders)
         self.on_table_orders_changed(old_orders=old_orders)
 
     def on_filter_orders_changed(self, orders):
-        self.set_table_orders(orders=orders)
+        self.set_table_orders(orders=sorted(orders, key=lambda order: order[DATE_INDEX]))
 
     def on_employers_changed(self, employers):
         menu = self.employers_menu["menu"]

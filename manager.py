@@ -16,7 +16,7 @@ import openpyxl
 
 from table import tableGUI
 from filemanager import filemanager
-from filterMenu import filterGUI
+from filtermenu import filterGUI
 
 
 MYXLNUMB_INDEX = 0
@@ -50,7 +50,9 @@ class Suplier_Manager(object):
     def create_widgets(self):
         self.table.grid(row=0, column=0)
 
-        menubar = tk.Menu(self)
+        menubar = tk.Menu()
+        menubar.add_cascade(label="Display", menu=self.filter)
+        self.config(menu=menubar)
 
         # buttons
         buttons_frame = tk.Frame(self)
@@ -79,7 +81,7 @@ class Suplier_Manager(object):
         self.__orders = tuple(copy.deepcopy(orders))
         self.on_orders_changed()
 
-    def on_orders_changed(self):                
+    def on_orders_changed(self):
         for listener in self.__listeners:
             if hasattr(listener, "on_orders_changed"):
                 listener.on_orders_changed(orders=self.get_orders())
@@ -97,9 +99,6 @@ class Suplier_Manager(object):
 
         return clear_orders
     
-    def get_free_orders(self) -> list:
-        return [order for order in self.get_orders() if order[3] == FREE_MARK]
-
     def get_employer_orders(self, employer) -> list:
         employer_orders = []
         for order in self.get_orders():
@@ -132,9 +131,6 @@ class Suplier_Manager(object):
     
     def subscribe(self, listener):
         self.__listeners.append(listener)
-
-    def set_config(self, cnf={}, **kw):
-        self.config(cnf=cnf, **kw)
     
     def config(self, cnf={}, **kw):
         raise NotImplementedError
@@ -178,16 +174,12 @@ class Extended_Webdriver(webdriver.Chrome):
         webdriver.Chrome.__init__(self, executable_path, port, options, service_args, desired_capabilities, service_log_path, chrome_options, keep_alive)
 
     def read_supliers_table(self) -> list:
-        orders = []
         table_element = driver.find_element_by_class_name("table-primary")
         pages_element = table_element.find_element(By.TAG_NAME, "pre")        
         pages = re.search('Page: (\d+) / (\d+)', pages_element.text)
         current_page = int(pages.group(1))
         last_page = int(pages.group(2))
-
-        ###############test###################
-        # last_page = 3
-        ###############test###################
+        orders = []
 
         if current_page != 1:
             self.goto_nes_table_first_page(table_element=table_element)
