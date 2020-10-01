@@ -7,7 +7,6 @@ from openpyxl.styles import Alignment
 FREE_MARK = ' '
 
 def read_csv_settings(file_path) -> dict:
-
     settings = {}
     with open(file_path, 'r', newline='') as csvfile:
         reader = csv.DictReader(csvfile, delimiter=";")

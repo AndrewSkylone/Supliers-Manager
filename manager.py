@@ -16,6 +16,7 @@ import openpyxl
 
 from table import tableGUI
 from filemanager import filemanager
+from filterMenu import filterGUI
 
 
 MYXLNUMB_INDEX = 0
@@ -32,10 +33,14 @@ settings = filemanager.read_csv_settings(file_path=os.path.join(MANAGER_DIR_PATH
 class Suplier_Manager(object):
     def __init__(self, driver):
         self.driver = driver
-        self.table = None
+        self.__listeners = []
         self.__orders = ()
         self.__employers = ()
-        self.__listeners = []
+        
+        self.table = tableGUI.TableGUI(master=self, app=self, height=int(settings['table rows']))
+        self.filter = filterGUI.FilterGui(tearoff=1)
+        self.filter.subscribe(self.table)
+        self.subscribe(self.filter)
 
         self.create_widgets()
 
@@ -43,9 +48,9 @@ class Suplier_Manager(object):
         self.set_employers(employers=settings['employers'])
 
     def create_widgets(self):
-        self.table = tableGUI.TableGUI(master=self, app=self, height=int(settings['table rows']))
         self.table.grid(row=0, column=0)
-        self.subscribe(self.table)
+
+        menubar = tk.Menu(self)
 
         # buttons
         buttons_frame = tk.Frame(self)
@@ -126,7 +131,13 @@ class Suplier_Manager(object):
                 listener.on_employers_changed(employers=self.get_employers())
     
     def subscribe(self, listener):
-        self.__listeners.append(listener)               
+        self.__listeners.append(listener)
+
+    def set_config(self, cnf={}, **kw):
+        self.config(cnf=cnf, **kw)
+    
+    def config(self, cnf={}, **kw):
+        raise NotImplementedError
 
 class Suplier_Manager_TopLevel(Suplier_Manager, tk.Toplevel):
     """ Singleton """
@@ -149,8 +160,8 @@ class Suplier_Manager_TopLevel(Suplier_Manager, tk.Toplevel):
             cls.instance.destroy()
         return tk.Toplevel.__new__(cls)
     
-    def title(self, title):
-        tk.Toplevel.title(self, title)
+    def config(self, cnf={}, **kw):
+        tk.Toplevel.config(self, cnf=cnf, **kw)
 
 class Suplier_Manager_Frame(Suplier_Manager, tk.Frame):
     def __init__(self, master, driver, cnf={}, **kw):
@@ -158,9 +169,9 @@ class Suplier_Manager_Frame(Suplier_Manager, tk.Frame):
         Suplier_Manager.__init__(self, driver)
 
         self.master.resizable(False, False)
-   
-    def title(self, title):
-        self.master.title(title)
+    
+    def config(self, cnf={}, **kw):
+        self.master.config(cnf=cnf, **kw)
 
 class Extended_Webdriver(webdriver.Chrome):
     def __init__(self, executable_path="chromedriver", port=0, options=None, service_args=None, desired_capabilities=None, service_log_path=None, chrome_options=None, keep_alive=True):
@@ -244,10 +255,10 @@ if __name__ == "__main__":
     root = tk.Tk()
 
     driver = None
-    root.protocol("WM_DELETE_WINDOW", on_closing)    
+    # root.protocol("WM_DELETE_WINDOW", on_closing)    
 
-    driver = create_profile_chrome_driver()
-    driver.get("https://nesky.hktemas.com/no-suppliers")
+    # driver = create_profile_chrome_driver()
+    # driver.get("https://nesky.hktemas.com/no-suppliers")
     
     frame = Suplier_Manager_Frame(root, driver=driver)
     frame.grid()    

@@ -19,19 +19,17 @@ class TableGUI(tk.Frame):
         self.app = app
         self.table_height = height
         self.__table_orders = ()
-        self.table = None
-        self.navigator = None
+        self.table = TreeView(master=self, app=self, height=self.table_height, show="headings")
+        self.navigator = Navigator(master=self, app=self)
         self.__listeners = []
+
+        self.subscribe(self.navigator)
+        self.navigator.subscribe(self.table)
 
         self.create_widgets()
     
     def create_widgets(self):
-        self.table = TreeView(master=self, app=self, height=self.table_height, show="headings")
         self.table.grid(row=0, column=0, columnspan=2)
-
-        self.navigator = Navigator(master=self, app=self)
-        self.subscribe(self.navigator)
-        self.navigator.subscribe(self.table)
         self.navigator.grid(row=1, column=0, padx=5, pady=5, sticky='w')
 
         employers_frame = tk.Frame(self)
@@ -54,7 +52,7 @@ class TableGUI(tk.Frame):
         self.__table_orders = tuple(copy.deepcopy(orders))
         self.on_table_orders_changed(old_orders=old_orders)
 
-    def on_orders_changed(self, orders):
+    def on_filter_orders_changed(self, orders):
         self.set_table_orders(orders=orders)
 
     def on_employers_changed(self, employers):
