@@ -38,6 +38,7 @@ class Suplier_Manager(object):
         self.__employers = ()
         
         self.table = tableGUI.TableGUI(master=self, app=self, height=int(settings['table rows']))
+        self.subscribe(self.table)
         self.filter = filterGUI.FilterGui(tearoff=1)
         self.filter.subscribe(self.table)
         self.subscribe(self.filter)
@@ -56,7 +57,7 @@ class Suplier_Manager(object):
 
         # buttons
         buttons_frame = tk.Frame(self)
-        buttons_frame.grid(row=1, column=0, sticky='w')
+        buttons_frame.grid(row=1, column=0, padx=5, pady=5, sticky='w')
 
         read_nes_table_button = tk.Button(buttons_frame, text="read NES orders", font=("Calibri", 12), command=self.read_nes_table)
         read_nes_table_button.grid(row=1, column=0)
