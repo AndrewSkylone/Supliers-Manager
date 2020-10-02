@@ -244,5 +244,7 @@ class Navigator(tk.Frame):
 
         if 0 < page and page <= pages :
             self.page.set(page)
+        elif page > pages:
+            self.page.set(pages)
         else:
             self.page.set(1)

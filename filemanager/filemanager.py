@@ -77,7 +77,7 @@ def get_orders_from_file(file_path):
             order.append(cell.value if cell.value else FREE_MARK)
 
         orders.append(order)
-
+    
     return orders
 
 def adjust_sheet_cells(sheet):
@@ -88,7 +88,6 @@ def adjust_sheet_cells(sheet):
                 max_width = len(str(cell.value))
 
         sheet.column_dimensions[col[0].column_letter].width = max_width * 1.2
-
 
 if __name__ == "__main__":
     print(read_csv_settings('D:\Програмування\Projects\Suplier Manager\settings\settings.csv'))

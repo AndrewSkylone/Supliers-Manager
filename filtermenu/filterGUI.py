@@ -47,10 +47,13 @@ class FilterGui(tk.Menu):
         self.__listeners.append(listener)
     
     def filter_orders(self, orders) -> list:
-        filtered = copy.deepcopy(orders)
+        checks_num = len([var for var in self.vars.values() if var.get()])
+        uncheck_num = len(self.vars) - checks_num
 
-        
-
+        if checks_num > uncheck_num:
+            filtered = self.filter_orders_by_remove(orders=orders)
+        else:
+            filtered = self.filter_orders_by_add(orders=orders)
 
         return filtered
     
@@ -58,7 +61,7 @@ class FilterGui(tk.Menu):
         filtered = []
 
         for employer in self.vars:
-            if not self.vars[employer]:
+            if not self.vars[employer].get():
                 continue
 
             for order in orders:
@@ -71,7 +74,7 @@ class FilterGui(tk.Menu):
         filtered = copy.deepcopy(orders)
 
         for employer in self.vars:
-            if not self.vars[employer]:
+            if self.vars[employer].get():
                 continue
 
             for order in orders:
