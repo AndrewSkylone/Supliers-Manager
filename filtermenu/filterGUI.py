@@ -41,13 +41,44 @@ class FilterGui(tk.Menu):
             self.vars.update({employer : tk.StringVar()})
             self.add_checkbutton(label=employer, variable=self.vars[employer], onvalue=employer, offvalue='',
                                 command=lambda label=employer: self.on_checkbox_click(label=label))
+        self.check_all()
         
     def subscribe(self, listener):
         self.__listeners.append(listener)
     
-    def filter_orders(self, orders):
-        self.check_all()
-        return orders
+    def filter_orders(self, orders) -> list:
+        filtered = copy.deepcopy(orders)
+
+        
+
+
+        return filtered
+    
+    def filter_orders_by_add(self, orders) -> list:
+        filtered = []
+
+        for employer in self.vars:
+            if not self.vars[employer]:
+                continue
+
+            for order in orders:
+                if order[EMPLOYER_INDEX] == employer:
+                    filtered.append(order)
+        
+        return filtered
+
+    def filter_orders_by_remove(self, orders) -> list:
+        filtered = copy.deepcopy(orders)
+
+        for employer in self.vars:
+            if not self.vars[employer]:
+                continue
+
+            for order in orders:
+                if order[EMPLOYER_INDEX] == employer:
+                    filtered.remove(order)
+        
+        return filtered
 
     def on_filter_orders_changed(self):
         for listener in self.__listeners:

@@ -18,11 +18,10 @@ class TableGUI(tk.Frame):
 
         self.app = app
         self.table_height = height
+        self.__listeners = []
         self.__table_orders = []
         self.table = TreeView(master=self, app=self, height=self.table_height, show="headings")
         self.navigator = Navigator(master=self, app=self)
-        self.__listeners = []
-
         self.subscribe(self.navigator)
         self.navigator.subscribe(self.table)
 
@@ -40,20 +39,17 @@ class TableGUI(tk.Frame):
         self.employers_menu.config(font=('Arial', 13), width=16)
         self.employers_menu.variable = variable
         self.employers_menu.grid(row=0, column=0, sticky='w' + 'e')
-
-        send_orders_button = tk.Button(employers_frame, text="send orders", font=('Arial', 12), command=self.send_orders)
-        send_orders_button.grid(row=1, column=0, sticky='w' + 'e')
+        variable.trace('w', self.send_orders)
 
     def get_table_orders(self) -> list:
         return copy.deepcopy(self.__table_orders)
     
     def set_table_orders(self, orders):
-        old_orders = self.get_table_orders()
         self.__table_orders = copy.deepcopy(orders)
-        self.on_table_orders_changed(old_orders=old_orders)
+        self.on_table_orders_changed()
 
     def on_filter_orders_changed(self, orders):
-        self.set_table_orders(orders=sorted(orders, key=lambda order: order[DATE_INDEX]))
+        self.set_table_orders(orders=orders)
 
     def on_employers_changed(self, employers):
         menu = self.employers_menu["menu"]
@@ -66,12 +62,7 @@ class TableGUI(tk.Frame):
     def subscribe(self, listener):
         self.__listeners.append(listener)
 
-    def on_table_orders_changed(self, old_orders):
-        if len(old_orders) == len(self.get_table_orders()):
-            self.table.show_page(page=int(self.navigator.page.get()))
-        else:
-            self.navigator.page.set(1)  
-
+    def on_table_orders_changed(self):
         for listener in self.__listeners:
             listener.on_table_orders_changed(orders=self.get_table_orders())
     
@@ -87,15 +78,18 @@ class TableGUI(tk.Frame):
 
         self.set_table_orders(orders=orders)
     
-    def send_orders(self):
+    def send_orders(self, *args):
         orders = self.app.get_orders()
         orders_numbers = [order[MYXLNUMB_INDEX] for order in orders]
         selected_orders = self.table.get_selected_orders()
-
+        for_copy = ''
+        
         for selected in selected_orders:
             order_index = orders_numbers.index(selected[MYXLNUMB_INDEX])
             orders[order_index][EMPLOYER_INDEX] = self.employers_menu.variable.get()
+            for_copy += str(selected[MYXLNUMB_INDEX]) + '\t' + str(selected[DATE_INDEX]) + '\n'  
         
+        pyperclip.copy(for_copy)
         self.app.set_orders(orders=orders)
 
 class TreeView(ttk.Treeview):
@@ -121,7 +115,7 @@ class TreeView(ttk.Treeview):
         self.tag_configure("all", font=("Arial", 11))
         self.tag_bind("all", "<Return>", self.open_selected_in_browser)
         self.tag_bind("all", "<Button-1>", self.on_left_click)
-        self.tag_bind("all", "<Control-c>", self.copy_value)
+        self.tag_bind("all", "<Control-c>", self.copy_rows)
 
     def show_page(self, page):
         orders = self.app.get_table_orders()
@@ -163,14 +157,12 @@ class TreeView(ttk.Treeview):
         row = self.identify_row(event.y)
         self.selection_toggle(row)
 
-    def copy_value(self, event):
+    def copy_rows(self, event):
         selected_orders = self.get_selected_orders()
         result = ''
 
         for order in selected_orders:
-            for col in (MYXLNUMB_INDEX, DATE_INDEX):
-                result += str(order[col]) + '\t'
-            result += '\n' 
+            result += str(order[MYXLNUMB_INDEX]) + '\t' + str(order[DATE_INDEX]) + '\n' 
         
         pyperclip.copy(result)
     
@@ -246,3 +238,11 @@ class Navigator(tk.Frame):
  
     def on_table_orders_changed(self, orders):
         self.orders_num.set(f"Total items: {len(orders)}")
+
+        page = int(self.page.get())
+        pages = int(self.get_pages_num())
+
+        if 0 < page and page <= pages :
+            self.page.set(page)
+        else:
+            self.page.set(1)

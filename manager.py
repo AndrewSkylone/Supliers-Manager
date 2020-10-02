@@ -33,12 +33,13 @@ FREE_MARK = ' '
 settings = filemanager.read_csv_settings(file_path=os.path.join(MANAGER_DIR_PATH, "settings", "settings.csv"))
 
 class Suplier_Manager(object):
-    def __init__(self, driver):
-        self.driver = driver
+    def __init__(self, driver=None):
+        self.__driver = None
         self.__listeners = []
         self.__orders = ()
         self.__employers = ()
         
+        self.__statusbar = None
         self.table = tableGUI.TableGUI(master=self, app=self, height=int(settings['table rows']))
         self.subscribe(self.table)
         self.filter = filterGUI.FilterGui(tearoff=1)
@@ -47,8 +48,9 @@ class Suplier_Manager(object):
 
         self.create_widgets()
 
-        self.set_orders(orders=filemanager.get_orders_from_file(file_path=ORDERS_PATH))
+        self.set_driver(driver=driver)
         self.set_employers(employers=settings['employers'])
+        self.set_orders(orders=filemanager.get_orders_from_file(file_path=ORDERS_PATH))
 
     def create_widgets(self):
         self.table.grid(row=0, column=0)
@@ -59,24 +61,45 @@ class Suplier_Manager(object):
 
         # buttons
         buttons_frame = tk.Frame(self)
-        buttons_frame.grid(row=1, column=0, padx=5, pady=5, sticky='w')
+        buttons_frame.grid(row=1, column=0, padx=5, pady=5, sticky='w'+'e')
+
+        execute_button = tk.Button(buttons_frame, text="execute driver", font=("Calibri", 12), command=self.execute_driver)
+        execute_button.grid(row=0, column=0)
 
         read_nes_table_button = tk.Button(buttons_frame, text="read NES orders", font=("Calibri", 12), command=self.read_nes_table)
-        read_nes_table_button.grid(row=1, column=0)
+        read_nes_table_button.grid(row=0, column=1)
 
         save_button = tk.Button(buttons_frame, text="save file", font=("Calibri", 12), command=self.save_file)
-        save_button.grid(row=1, column=1)
+        save_button.grid(row=0, column=2)
+
+        statusvar = tk.StringVar() 
+        self.__statusbar = tk.Entry(buttons_frame, state='readonly', font=("Calibri", 16), bd=0, textvariable=statusvar)
+        self.__statusbar.textvariable = statusvar
+        self.__statusbar.grid(row=0, column=3, padx=10, sticky='w'+'e')
 
     def save_file(self, file_path=ORDERS_PATH):
         filemanager.save_orders_to_file(orders=self.get_orders(), file_path=file_path, save_backup=settings['save backups'])
         filemanager.save_employers_data_to_table(employers_data=self.get_employers_data(), table_path=ORDERS_PATH)        
     
     def read_nes_table(self):
-        nes_orders = self.driver.read_supliers_table()
+        if not self.get_driver():
+            tk.messagebox.showerror(title='Driver error', message='Execute driver for continue')
+            self.set_status(fg='red', message='Driver error. Execute for continue')
+            return
+
+        nes_orders = self.get_driver().read_supliers_table()
         marked_orders = self.mark_orders_by_employers(marked_orders=self.get_orders(), clear_orders=nes_orders)
 
         self.set_orders(orders=marked_orders)
-       
+
+    def execute_driver(self):
+        executable_path = os.path.join(MANAGER_DIR_PATH, "chromedriver", "chromedriver.exe")
+        profile_path = settings['profile path']
+        driver = Extended_Webdriver.create_profile_chrome_driver(executable_path, profile_path)
+
+        driver.get("https://nesky.hktemas.com/no-suppliers")
+        self.set_driver(driver)
+
     def get_orders(self) -> list:
         return list(copy.deepcopy(self.__orders))
     
@@ -135,13 +158,24 @@ class Suplier_Manager(object):
     def subscribe(self, listener):
         self.__listeners.append(listener)
     
+    def set_driver(self, driver):
+        Extended_Webdriver.extend_driver(driver=driver)
+        self.__driver = driver
+    
+    def get_driver(self) -> webdriver:
+        return self.__driver
+    
+    def set_status(self, fg='green', message='task finished successfully'):
+        self.__statusbar.config(fg=fg)
+        self.__statusbar.textvariable.set(message)
+    
     def config(self, cnf={}, **kw):
         raise NotImplementedError
 
 class Suplier_Manager_TopLevel(Suplier_Manager, tk.Toplevel):
     """ Singleton """
 
-    def __init__(self, master, driver, cnf={}, **kw):
+    def __init__(self, master, driver=None, cnf={}, **kw):
         tk.Toplevel.__init__(self, master, cnf, **kw)
         Suplier_Manager.__init__(self, driver)
 
@@ -150,7 +184,6 @@ class Suplier_Manager_TopLevel(Suplier_Manager, tk.Toplevel):
         mouseX, mouseY = self.get_mouse_position()
         self.geometry(f"+{mouseX}+{mouseY}")
         self.resizable(False, False)
-        self.protocol("WM_DELETE_WINDOW", self.on_closing)    
                 
     def get_mouse_position(self):
         return self.master.winfo_pointerx(), self.master.winfo_pointery()
@@ -163,12 +196,8 @@ class Suplier_Manager_TopLevel(Suplier_Manager, tk.Toplevel):
     def config(self, cnf={}, **kw):
         tk.Toplevel.config(self, cnf=cnf, **kw)
 
-    def on_closing(self):
-        self.destroy()
-        plot.close('all')
-
 class Suplier_Manager_Frame(Suplier_Manager, tk.Frame):
-    def __init__(self, master, driver, cnf={}, **kw):
+    def __init__(self, master, driver=None, cnf={}, **kw):
         tk.Frame.__init__(self, master, cnf, **kw)
         Suplier_Manager.__init__(self, driver)
 
@@ -177,12 +206,29 @@ class Suplier_Manager_Frame(Suplier_Manager, tk.Frame):
     def config(self, cnf={}, **kw):
         self.master.config(cnf=cnf, **kw)
 
-class Extended_Webdriver(webdriver.Chrome):
-    def __init__(self, executable_path="chromedriver", port=0, options=None, service_args=None, desired_capabilities=None, service_log_path=None, chrome_options=None, keep_alive=True):
-        webdriver.Chrome.__init__(self, executable_path, port, options, service_args, desired_capabilities, service_log_path, chrome_options, keep_alive)
+class Extended_Webdriver(object):
+    @classmethod
+    def extend_driver(cls, driver):
+        """ Extending driver functional to all Extended_Webdriver functions """
+
+        if not driver:
+            return
+
+        for attr in cls.__dict__:
+            if not hasattr(driver.__class__, attr):
+                setattr(driver.__class__, attr, cls.__dict__[attr])
+
+    @staticmethod
+    def create_profile_chrome_driver(executable_path, profile_path) -> webdriver.Chrome:
+        chrome_options = Options()
+        chrome_options.add_argument(fr"user-data-dir={profile_path}")
+        caps = DesiredCapabilities().CHROME
+        caps["pageLoadStrategy"] = "none"
+
+        return webdriver.Chrome(desired_capabilities=caps, executable_path=executable_path, options=chrome_options)          
 
     def read_supliers_table(self) -> list:
-        table_element = driver.find_element_by_class_name("table-primary")
+        table_element = self.find_element_by_class_name("table-primary")
         pages_element = table_element.find_element(By.TAG_NAME, "pre")        
         pages = re.search('Page: (\d+) / (\d+)', pages_element.text)
         current_page = int(pages.group(1))
@@ -203,15 +249,15 @@ class Extended_Webdriver(webdriver.Chrome):
         """ Press first button in NES table. Checking if table text changed, else page not switched """
 
         first_button = table_element.find_element_by_link_text("First")
-        driver.execute_script("arguments[0].click()", first_button)        
-        WebDriverWait(driver, 5).until_not(EC.text_to_be_present_in_element((By.CLASS_NAME, "table-primary"), table_element.text))
+        self.execute_script("arguments[0].click()", first_button)        
+        WebDriverWait(self, 5).until_not(EC.text_to_be_present_in_element((By.CLASS_NAME, "table-primary"), table_element.text))
     
     def goto_nes_table_next_page(self, table_element):
         """ Press next button in NES table. Checking if table text changed, else page not switched """
 
         next_button = table_element.find_element_by_link_text("Next")
-        driver.execute_script("arguments[0].click()", next_button)
-        WebDriverWait(driver, 5).until_not(EC.text_to_be_present_in_element((By.CLASS_NAME, "table-primary"), table_element.text))
+        self.execute_script("arguments[0].click()", next_button)
+        WebDriverWait(self, 5).until_not(EC.text_to_be_present_in_element((By.CLASS_NAME, "table-primary"), table_element.text))
 
     def read_supliers_page_orders(self, table_element) -> list:
         """ Read supliers MYXLnumber, update date, number columns data. Using search all td elements instead selector because it faster.
@@ -226,41 +272,23 @@ class Extended_Webdriver(webdriver.Chrome):
 
         for row in range(rows):
             order = []
-            order.append(td_elements[row * COLUMNS + MYXLNUMB_INDEX].text)
-            order.append(td_elements[row * COLUMNS + DATE_INDEX].text.split(' ')[0])
-            order.append(td_elements[row * COLUMNS + NUMBER_INDEX].text)
+            order.append(td_elements[row * COLUMNS + 4].text)
+            order.append(td_elements[row * COLUMNS + 2].text.split(' ')[0])
+            order.append(td_elements[row * COLUMNS + 0].text)
             orders.append(order + [FREE_MARK])
 
         return orders
-
+    
 if __name__ == "__main__":
 
-    def create_profile_chrome_driver() -> Extended_Webdriver:
-        """ Create chrome webdriver with default user profile """
-        
-        os.chdir(sys.path[0])
-        executable_path = os.path.join("chromedriver","chromedriver.exe")
-
-        chrome_options = Options()
-        chrome_options.add_argument(r"user-data-dir=C:\Users\andre\AppData\Local\Google\Chrome\User Data")
-        caps = DesiredCapabilities().CHROME
-        caps["pageLoadStrategy"] = "none"
-
-        return Extended_Webdriver(desired_capabilities=caps, executable_path=executable_path, options=chrome_options)
-
     def on_closing():
-            driver.quit()
             root.destroy()
             plot.close('all')
 
     root = tk.Tk()
 
-    driver = None
     root.protocol("WM_DELETE_WINDOW", on_closing)    
-
-    driver = create_profile_chrome_driver()
-    driver.get("https://nesky.hktemas.com/no-suppliers")
     
-    frame = Suplier_Manager_Frame(root, driver=driver)
+    frame = Suplier_Manager_Frame(root)
     frame.grid()    
     root.mainloop()
