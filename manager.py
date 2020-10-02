@@ -50,7 +50,8 @@ class Suplier_Manager(object):
 
         self.set_driver(driver=driver)
         self.set_employers(employers=settings['employers'])
-        self.set_orders(orders=filemanager.get_orders_from_file(file_path=ORDERS_PATH))
+        self.set_orders(self.get_orders_from_file(file_path=ORDERS_PATH))        
+
 
     def create_widgets(self):
         self.table.grid(row=0, column=0)
@@ -63,42 +64,65 @@ class Suplier_Manager(object):
         buttons_frame = tk.Frame(self)
         buttons_frame.grid(row=1, column=0, padx=5, pady=5, sticky='w'+'e')
 
+        statusbar = tk.LabelFrame(buttons_frame, text='status')
+        statusbar.grid(row=0, column=0, columnspan=3, sticky='w'+'e')
+        statusvar = tk.StringVar() 
+        self.__statusbar = tk.Entry(statusbar, state='readonly', font=("Calibri", 14), width=40, bd=0, textvariable=statusvar, justify='center')
+        self.__statusbar.textvariable = statusvar
+        self.__statusbar.grid(row=0, column=0, pady=5, sticky='w'+'e')
+
         execute_button = tk.Button(buttons_frame, text="execute driver", font=("Calibri", 12), command=self.execute_driver)
-        execute_button.grid(row=0, column=0)
+        execute_button.grid(row=1, column=0, sticky='w'+'e')
 
         read_nes_table_button = tk.Button(buttons_frame, text="read NES orders", font=("Calibri", 12), command=self.read_nes_table)
-        read_nes_table_button.grid(row=0, column=1)
+        read_nes_table_button.grid(row=1, column=1, sticky='w'+'e')
 
         save_button = tk.Button(buttons_frame, text="save file", font=("Calibri", 12), command=self.save_file)
-        save_button.grid(row=0, column=2)
+        save_button.grid(row=1, column=2, sticky='w'+'e')
 
-        statusvar = tk.StringVar() 
-        self.__statusbar = tk.Entry(buttons_frame, state='readonly', font=("Calibri", 16), bd=0, textvariable=statusvar)
-        self.__statusbar.textvariable = statusvar
-        self.__statusbar.grid(row=0, column=3, padx=10, sticky='w'+'e')
 
     def save_file(self, file_path=ORDERS_PATH):
-        filemanager.save_orders_to_file(orders=self.get_orders(), file_path=file_path, save_backup=settings['save backups'])
-        filemanager.save_employers_data_to_table(employers_data=self.get_employers_data(), table_path=ORDERS_PATH)        
+        try:
+            filemanager.save_orders_to_file(orders=self.get_orders(), file_path=file_path, save_backup=settings['save backups'])
+            filemanager.save_employers_data_to_table(employers_data=self.get_employers_data(), table_path=ORDERS_PATH)
+        except:
+            self.set_status(fg='red', message='Saving file failed')
+        else:
+            self.set_status(message='The file was saved successfully')
     
+    def get_orders_from_file(self, file_path) -> list:
+        try:
+            orders = filemanager.get_orders_from_file(file_path=file_path)
+        except:
+            self.set_status(fg='red', message=f'Reading failed {file_path}')
+            return []
+        else:
+            self.set_status(message='File read successfully')
+            return orders
+
     def read_nes_table(self):
         if not self.get_driver():
-            tk.messagebox.showerror(title='Driver error', message='Execute driver for continue')
-            self.set_status(fg='red', message='Driver error. Execute for continue')
+            self.set_status(fg='red', message='driver error. Execute driver to continue')
             return
 
         nes_orders = self.get_driver().read_supliers_table()
         marked_orders = self.mark_orders_by_employers(marked_orders=self.get_orders(), clear_orders=nes_orders)
 
         self.set_orders(orders=marked_orders)
+        self.set_status(message='reading succsessfully')
 
     def execute_driver(self):
         executable_path = os.path.join(MANAGER_DIR_PATH, "chromedriver", "chromedriver.exe")
         profile_path = settings['profile path']
-        driver = Extended_Webdriver.create_profile_chrome_driver(executable_path, profile_path)
 
-        driver.get("https://nesky.hktemas.com/no-suppliers")
-        self.set_driver(driver)
+        try:
+            driver = Extended_Webdriver.create_profile_chrome_driver(executable_path, profile_path)
+        except:
+            self.set_status(fg='red', message='driver failed. Close chrome windows to continue')
+        else:            
+            driver.get("https://nesky.hktemas.com/no-suppliers")
+            self.set_driver(driver)
+            self.set_status(fg='green', message='driver ready')
 
     def get_orders(self) -> list:
         return list(copy.deepcopy(self.__orders))
