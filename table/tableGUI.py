@@ -20,8 +20,8 @@ class TableGUI(tk.Frame):
         self.table_height = height
         self.__listeners = []
         self.__table_orders = []
-        self.table = TreeView(master=self, app=self, height=self.table_height, show="headings")
-        self.navigator = Navigator(master=self, app=self)
+        self.table = TreeView(master=self, tableGUI=self, height=self.table_height)
+        self.navigator = Navigator(master=self, tableGUI=self)
         self.subscribe(self.navigator)
         self.navigator.subscribe(self.table)
 
@@ -93,32 +93,34 @@ class TableGUI(tk.Frame):
         self.app.set_orders(orders=orders)
 
 class TreeView(ttk.Treeview):
-    def __init__(self, master, app, **kw):
+    def __init__(self, master, tableGUI, **kw):
         ttk.Treeview.__init__(self, master, **kw)
 
         self.rows = int(self['height'])
-        self.app = app
+        self.tableGUI = tableGUI
 
         self["columns"] = (0, 1, 2, 3)
+        self.column('#0', width=60)
         self.column(0, width=180)
         self.column(1, width=110)
         self.column(2, width=100)
         self.column(3, width=150)
 
+        self.heading('#0', text="№")
         self.heading(0, text="MYXL number")
-        self.heading(1, text="Updated date", command=self.app.sort_orders_by_date)
-        self.heading(2, text="№")
-        self.heading(3, text="User", command=self.app.sort_orders_by_user)
+        self.heading(1, text="Updated date", command=self.tableGUI.sort_orders_by_date)
+        self.heading(2, text="Order number")
+        self.heading(3, text="User", command=self.tableGUI.sort_orders_by_user)
 
         for i in range(self.rows):
-            self.insert("", "end", iid=i, tags="all")
+            self.insert("", "end", iid=i, tags="all", text=i+1)
         self.tag_configure("all", font=("Arial", 11))
         self.tag_bind("all", "<Return>", self.open_selected_in_browser)
         self.tag_bind("all", "<Button-1>", self.on_left_click)
         self.tag_bind("all", "<Control-c>", self.copy_rows)
 
     def show_page(self, page):
-        orders = self.app.get_table_orders()
+        orders = self.tableGUI.get_table_orders()
 
         self.clear()
         index = (page - 1) * self.rows
@@ -167,10 +169,10 @@ class TreeView(ttk.Treeview):
         pyperclip.copy(result)
     
 class Navigator(tk.Frame):
-    def __init__(self, master, app, cnf={}, **kw):
+    def __init__(self, master, tableGUI, cnf={}, **kw):
         tk.Frame.__init__(self, master, cnf, **kw)
 
-        self.app = app
+        self.tableGUI = tableGUI
         self.__listeners = []
 
         self.page = tk.StringVar(value=1)
@@ -231,8 +233,8 @@ class Navigator(tk.Frame):
             listener.on_page_changed(page=int(self.page.get()))
     
     def get_pages_num(self) -> int:
-        orders_num = len(self.app.get_table_orders())
-        table_rows = self.app.table_height  
+        orders_num = len(self.tableGUI.get_table_orders())
+        table_rows = self.tableGUI.table_height  
 
         return math.ceil(orders_num / table_rows)
  
