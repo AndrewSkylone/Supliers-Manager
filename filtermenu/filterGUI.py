@@ -42,12 +42,11 @@ class FilterGui(tk.Menu):
             self.add_checkbutton(label=employer, variable=self.vars[employer], onvalue=employer, offvalue='',
                                 command=lambda label=employer: self.on_checkbox_click(label=label))
         
-        self.check_all()
-    
     def subscribe(self, listener):
         self.__listeners.append(listener)
     
     def filter_orders(self, orders):
+        self.check_all()
         return orders
 
     def on_filter_orders_changed(self):

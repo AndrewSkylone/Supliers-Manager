@@ -13,6 +13,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 import openpyxl
+import matplotlib.pyplot as plot
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 from table import tableGUI
 from filemanager import filemanager
@@ -148,6 +150,7 @@ class Suplier_Manager_TopLevel(Suplier_Manager, tk.Toplevel):
         mouseX, mouseY = self.get_mouse_position()
         self.geometry(f"+{mouseX}+{mouseY}")
         self.resizable(False, False)
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)    
                 
     def get_mouse_position(self):
         return self.master.winfo_pointerx(), self.master.winfo_pointery()
@@ -159,6 +162,10 @@ class Suplier_Manager_TopLevel(Suplier_Manager, tk.Toplevel):
     
     def config(self, cnf={}, **kw):
         tk.Toplevel.config(self, cnf=cnf, **kw)
+
+    def on_closing(self):
+        self.destroy()
+        plot.close('all')
 
 class Suplier_Manager_Frame(Suplier_Manager, tk.Frame):
     def __init__(self, master, driver, cnf={}, **kw):
@@ -219,9 +226,9 @@ class Extended_Webdriver(webdriver.Chrome):
 
         for row in range(rows):
             order = []
-            order.append(td_elements[row * COLUMNS + 4].text)
-            order.append(td_elements[row * COLUMNS + 2].text.split(' ')[0])
-            order.append(td_elements[row * COLUMNS + 0].text)
+            order.append(td_elements[row * COLUMNS + MYXLNUMB_INDEX].text)
+            order.append(td_elements[row * COLUMNS + DATE_INDEX].text.split(' ')[0])
+            order.append(td_elements[row * COLUMNS + NUMBER_INDEX].text)
             orders.append(order + [FREE_MARK])
 
         return orders
@@ -244,14 +251,15 @@ if __name__ == "__main__":
     def on_closing():
             driver.quit()
             root.destroy()
+            plot.close('all')
 
     root = tk.Tk()
 
     driver = None
-    # root.protocol("WM_DELETE_WINDOW", on_closing)    
+    root.protocol("WM_DELETE_WINDOW", on_closing)    
 
-    # driver = create_profile_chrome_driver()
-    # driver.get("https://nesky.hktemas.com/no-suppliers")
+    driver = create_profile_chrome_driver()
+    driver.get("https://nesky.hktemas.com/no-suppliers")
     
     frame = Suplier_Manager_Frame(root, driver=driver)
     frame.grid()    
