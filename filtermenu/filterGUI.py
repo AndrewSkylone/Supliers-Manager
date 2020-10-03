@@ -28,7 +28,7 @@ class FilterGui(tk.Menu):
     
     def set_filter_orders(self, orders):
         self.__filter_orders = copy.deepcopy(orders)
-        self.notify()
+        self.notify(changed='filter orders')
     
     def get_filter_orders(self) -> list:
         return copy.deepcopy(self.__filter_orders)
@@ -83,9 +83,9 @@ class FilterGui(tk.Menu):
         
         return filtered
 
-    def notify(self):
+    def notify(self, changed : str):
         for listener in self.__listeners:
-            if hasattr(listener, "on_filter_orders_changed"):
+            if changed == 'filter orders' and hasattr(listener, "on_filter_orders_changed"):
                 listener.on_filter_orders_changed(orders=self.get_filter_orders())
     
     def on_checkbox_click(self, label):

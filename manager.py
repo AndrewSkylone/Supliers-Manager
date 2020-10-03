@@ -129,7 +129,7 @@ class Suplier_Manager(object):
     
     def set_orders(self, orders):
         self.__orders = tuple(copy.deepcopy(orders))
-        self.notify()
+        self.notify(changed='orders')
     
     def mark_orders_by_employers(self, marked_orders, clear_orders) -> list:
         """ Marks orders by name of the employers who have this orders """
@@ -167,15 +167,15 @@ class Suplier_Manager(object):
     
     def set_employers(self, employers : list):
         self.__employers = tuple(employers)
-        self.notify()
+        self.notify(changed='employers')
     
-    def notify(self):
+    def notify(self, changed : str):
         for listener in self.__listeners:
-            if hasattr(listener, "on_employers_changed"):
+            if changed == 'employers' and hasattr(listener, "on_employers_changed"):
                 listener.on_employers_changed(employers=self.get_employers())
-            if hasattr(listener, "on_orders_changed"):
+            if changed == 'orders' and hasattr(listener, "on_orders_changed"):
                 listener.on_orders_changed(orders=self.get_orders())
-            if hasattr(listener, "on_employers_data_changed"):
+            if changed == 'employers data' and hasattr(listener, "on_employers_data_changed"):
                 listener.on_employers_data_changed(employers_data=self.get_employers_data())
     
     def subscribe(self, listener):
