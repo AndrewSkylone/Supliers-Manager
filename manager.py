@@ -129,12 +129,7 @@ class Suplier_Manager(object):
     
     def set_orders(self, orders):
         self.__orders = tuple(copy.deepcopy(orders))
-        self.on_orders_changed()
-
-    def on_orders_changed(self):
-        for listener in self.__listeners:
-            if hasattr(listener, "on_orders_changed"):
-                listener.on_orders_changed(orders=self.get_orders())
+        self.notify()
     
     def mark_orders_by_employers(self, marked_orders, clear_orders) -> list:
         """ Marks orders by name of the employers who have this orders """
@@ -172,12 +167,16 @@ class Suplier_Manager(object):
     
     def set_employers(self, employers : list):
         self.__employers = tuple(employers)
-        self.on_employers_changed()
+        self.notify()
     
-    def on_employers_changed(self):
+    def notify(self):
         for listener in self.__listeners:
             if hasattr(listener, "on_employers_changed"):
                 listener.on_employers_changed(employers=self.get_employers())
+            if hasattr(listener, "on_orders_changed"):
+                listener.on_orders_changed(orders=self.get_orders())
+            if hasattr(listener, "on_employers_data_changed"):
+                listener.on_employers_data_changed(employers_data=self.get_employers_data())
     
     def subscribe(self, listener):
         self.__listeners.append(listener)
@@ -192,6 +191,7 @@ class Suplier_Manager(object):
     def set_status(self, fg='green', message='task finished successfully'):
         self.__statusbar.config(fg=fg)
         self.__statusbar.textvariable.set(message)
+        self.__statusbar.update()
     
     def config(self, cnf={}, **kw):
         raise NotImplementedError
@@ -315,4 +315,5 @@ if __name__ == "__main__":
     
     frame = Suplier_Manager_Frame(root)
     frame.grid()    
+    
     root.mainloop()

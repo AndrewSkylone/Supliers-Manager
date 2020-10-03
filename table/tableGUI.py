@@ -46,7 +46,7 @@ class TableGUI(tk.Frame):
     
     def set_table_orders(self, orders):
         self.__table_orders = copy.deepcopy(orders)
-        self.on_table_orders_changed()
+        self.notify()
 
     def on_filter_orders_changed(self, orders):
         self.set_table_orders(orders=orders)
@@ -62,9 +62,10 @@ class TableGUI(tk.Frame):
     def subscribe(self, listener):
         self.__listeners.append(listener)
 
-    def on_table_orders_changed(self):
+    def notify(self):
         for listener in self.__listeners:
-            listener.on_table_orders_changed(orders=self.get_table_orders())
+            if hasattr(listener, 'on_table_orders_changed'):
+                listener.on_table_orders_changed(orders=self.get_table_orders())
     
     def sort_orders_by_date(self):
         orders = self.get_table_orders()
@@ -176,7 +177,7 @@ class Navigator(tk.Frame):
         self.__listeners = []
 
         self.page = tk.StringVar(value=1)
-        self.page.trace('w', self.on_page_changed)
+        self.page.trace('w', self.notify)
         self.pages = tk.StringVar(value="Page: 1 / 1")
         self.orders_num = tk.StringVar(value="Total items: 0")
 
@@ -221,7 +222,7 @@ class Navigator(tk.Frame):
     def subscribe(self, listener):
         self.__listeners.append(listener)    
     
-    def on_page_changed(self, *args):
+    def notify(self, *args):
         pages = self.get_pages_num()
         page = int(self.page.get())        
 

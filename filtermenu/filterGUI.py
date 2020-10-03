@@ -28,7 +28,7 @@ class FilterGui(tk.Menu):
     
     def set_filter_orders(self, orders):
         self.__filter_orders = copy.deepcopy(orders)
-        self.on_filter_orders_changed()
+        self.notify()
     
     def get_filter_orders(self) -> list:
         return copy.deepcopy(self.__filter_orders)
@@ -83,7 +83,7 @@ class FilterGui(tk.Menu):
         
         return filtered
 
-    def on_filter_orders_changed(self):
+    def notify(self):
         for listener in self.__listeners:
             if hasattr(listener, "on_filter_orders_changed"):
                 listener.on_filter_orders_changed(orders=self.get_filter_orders())
