@@ -19,6 +19,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from table import tableGUI
 from filemanager import filemanager
 from filtermenu import filterGUI
+from diagrams import diagramsGUI
 
 
 MYXLNUMB_INDEX = 0
@@ -34,6 +35,7 @@ settings = filemanager.read_csv_settings(file_path=os.path.join(MANAGER_DIR_PATH
 
 class Suplier_Manager(object):
     def __init__(self, driver=None):
+        self.title(title='Suplier Manager')
         self.__driver = None
         self.__listeners = []
         self.__orders = ()
@@ -54,6 +56,7 @@ class Suplier_Manager(object):
 
 
     def create_widgets(self):
+        self.table.__dict__['master'] = tk.LabelFrame(self, text='Label')
         self.table.grid(row=0, column=0)
 
         menubar = tk.Menu()
@@ -80,6 +83,8 @@ class Suplier_Manager(object):
         save_button = tk.Button(buttons_frame, text="save file", font=("Calibri", 12), command=self.save_file)
         save_button.grid(row=1, column=2, sticky='w'+'e')
 
+        # diagrams
+
 
     def save_file(self, file_path=ORDERS_PATH):
         try:
@@ -102,7 +107,7 @@ class Suplier_Manager(object):
 
     def read_nes_table(self):
         if not self.get_driver():
-            self.set_status(fg='red', message='driver error. Execute driver to continue')
+            self.set_status(fg='red', message='Driver error. Execute driver to continue')
             return
 
         nes_orders = self.get_driver().read_supliers_table()
@@ -118,7 +123,7 @@ class Suplier_Manager(object):
         try:
             driver = Extended_Webdriver.create_profile_chrome_driver(executable_path, profile_path)
         except:
-            self.set_status(fg='red', message='driver failed. Close chrome windows to continue')
+            self.set_status(fg='red', message='Driver failed. Close chrome windows to continue')
         else:            
             driver.get("https://nesky.hktemas.com/no-suppliers")
             self.set_driver(driver)
@@ -138,7 +143,7 @@ class Suplier_Manager(object):
 
         for marked in marked_orders:
             for clear in clear_orders:
-                if marked[MYXLNUMB_INDEX] == clear[MYXLNUMB_INDEX]:
+                if clear[MYXLNUMB_INDEX] == marked[MYXLNUMB_INDEX]:
                     clear[EMPLOYER_INDEX] = marked[EMPLOYER_INDEX]
                     break
 
@@ -170,19 +175,20 @@ class Suplier_Manager(object):
         self.notify(changed='employers')
     
     def notify(self, changed : str):
+        """ Notify listeners about intresting events. Argument changed need for call only one function in listener """
+
         for listener in self.__listeners:
             if changed == 'employers' and hasattr(listener, "on_employers_changed"):
                 listener.on_employers_changed(employers=self.get_employers())
             if changed == 'orders' and hasattr(listener, "on_orders_changed"):
                 listener.on_orders_changed(orders=self.get_orders())
-            if changed == 'employers data' and hasattr(listener, "on_employers_data_changed"):
-                listener.on_employers_data_changed(employers_data=self.get_employers_data())
     
     def subscribe(self, listener):
         self.__listeners.append(listener)
     
     def set_driver(self, driver):
-        Extended_Webdriver.extend_driver(driver=driver)
+        if driver:
+            Extended_Webdriver.extend_driver(driver=driver)
         self.__driver = driver
     
     def get_driver(self) -> webdriver:
@@ -194,6 +200,9 @@ class Suplier_Manager(object):
         self.__statusbar.update()
     
     def config(self, cnf={}, **kw):
+        raise NotImplementedError
+    
+    def title(self, title):
         raise NotImplementedError
 
 class Suplier_Manager_TopLevel(Suplier_Manager, tk.Toplevel):
@@ -207,7 +216,7 @@ class Suplier_Manager_TopLevel(Suplier_Manager, tk.Toplevel):
 
         mouseX, mouseY = self.get_mouse_position()
         self.geometry(f"+{mouseX}+{mouseY}")
-        self.resizable(False, False)
+        self.resizable(True, False)
                 
     def get_mouse_position(self):
         return self.master.winfo_pointerx(), self.master.winfo_pointery()
@@ -219,24 +228,27 @@ class Suplier_Manager_TopLevel(Suplier_Manager, tk.Toplevel):
     
     def config(self, cnf={}, **kw):
         tk.Toplevel.config(self, cnf=cnf, **kw)
+    
+    def title(self, title):
+        tk.Toplevel.title(self, title)
 
 class Suplier_Manager_Frame(Suplier_Manager, tk.Frame):
     def __init__(self, master, driver=None, cnf={}, **kw):
         tk.Frame.__init__(self, master, cnf, **kw)
         Suplier_Manager.__init__(self, driver)
 
-        self.master.resizable(False, False)
+        self.master.resizable(True, False)
     
     def config(self, cnf={}, **kw):
         self.master.config(cnf=cnf, **kw)
 
+    def title(self, title):
+        self.master.title(title)
+
 class Extended_Webdriver(object):
     @classmethod
-    def extend_driver(cls, driver):
+    def extend_driver(cls, driver : webdriver.Chrome):
         """ Extending driver functional to all Extended_Webdriver functions """
-
-        if not driver:
-            return
 
         for attr in cls.__dict__:
             if not hasattr(driver.__class__, attr):

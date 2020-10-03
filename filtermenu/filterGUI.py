@@ -83,10 +83,13 @@ class FilterGui(tk.Menu):
         
         return filtered
 
-    def notify(self, changed : str):
+    def notify(self, changed : str, **kw):
         for listener in self.__listeners:
             if changed == 'filter orders' and hasattr(listener, "on_filter_orders_changed"):
                 listener.on_filter_orders_changed(orders=self.get_filter_orders())
+            if changed == 'checkbox' and hasattr(listener, "on_checkbox_cicked"):
+                listener.on_checkbox_cicked(checkbox=kw['checkbox'])
+                print(kw['checkbox'])
     
     def on_checkbox_click(self, label):
         vars_ = self.vars
@@ -107,6 +110,7 @@ class FilterGui(tk.Menu):
                 orders = self.remove_mark_orders(orders=orders, mark=label)
         
         self.set_filter_orders(orders=orders)
+        self.notify(changed='checkbox', checkbox={label : vars_[label]})
         
     def check_all(self):
         for label in self.vars:
