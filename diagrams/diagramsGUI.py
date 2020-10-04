@@ -23,43 +23,46 @@ class Diagrams_Frame(tk.Frame):
     def create_widgets(self):
         self.bar_fig, self.b_ax = plt.subplots(figsize=[8, 4], facecolor=(0.94, 0.94, 0.94))
         self.tk_bar_fig = FigureCanvasTkAgg(self.bar_fig, self)
-        self.tk_bar_fig.get_tk_widget().grid(row=0, column=0)
-        
+        self.tk_bar_fig.get_tk_widget().grid(row=0, column=0)        
 
-        self.pie_fig, self.p_ax = plt.subplots(figsize=[2, 2])
+        self.pie_fig, self.p_ax = plt.subplots(figsize=[2.5, 2.5], facecolor=(0.94, 0.94, 0.94))
         self.tk_pie_fig = FigureCanvasTkAgg(self.pie_fig, self)
-        self.tk_pie_fig.get_tk_widget().grid(row=1, column=0)
-        # bar_fig.set_dpi(100)
+        self.tk_pie_fig.get_tk_widget().grid(row=1, column=0, sticky='w')
 
     def draw_diagrams(self):
-        orders_data = self.get_orders_data()
+        self.draw_bar()
+        self.draw_pie()
+    
+    def draw_bar(self):
         employers_data = self.get_orders_data()
         free_data = employers_data.pop('Free')
-
         employers = list(employers_data.keys())
         orders_nums = [len(employers_data[employer]) for employer in employers]
+        max_num = max(orders_nums)
 
-        self.draw_bar(labels=employers, height=orders_nums)
-        # self.draw_pie()
-    
-    def draw_bar(self, labels, height):
-        max_num = max(height)
         colors = []
-        for num in height:
+        for num in orders_nums:
             color = self.get_value_RGB_color(num, max_num)
             colors.append(color)
         
-        x = list(range(len(labels)))
-        rects = self.b_ax.bar(x=x, height=height, color=colors)
+        x = list(range(len(employers)))
+        rects = self.b_ax.bar(x=x, height=orders_nums, color=colors)
         self.b_ax.grid(True, which='both', axis='y', alpha=0.15)
         self.b_ax.set_xticks(x)
-        self.b_ax.set_xticklabels(labels, rotation=90)
+        self.b_ax.set_xticklabels(employers, rotation=90)
 
         self.autolabel(rects=rects)
         self.bar_fig.tight_layout()
 
     def draw_pie(self):
-        self.p_ax.pie()
+        orders_data = self.get_orders_data()
+        labels = [name.split()[0] for name in orders_data.keys()]
+        sizes = [len(orders) for orders in orders_data.values()]
+        explode = [0 for i in range(len(labels))]
+        explode[labels.index('Free')] = 0.15
+        
+        self.p_ax.pie(sizes, explode=explode, labels=labels, autopct='%d%%', rotatelabels=True)
+        self.pie_fig.tight_layout()
 
     def autolabel(self, rects):
         """Attach a text label above each bar in *rects*, displaying its height."""

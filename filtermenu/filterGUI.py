@@ -100,6 +100,7 @@ class FilterGui(tk.Menu):
                 orders = self.get_backup_orders()
             else:
                 orders += self.get_mark_orders(orders=self.get_backup_orders(), mark=label)
+                # select 'All' checkbox if all(without 'All') checkboxes checked
                 checks = len([var for var in vars_.values() if var.get()])
                 vars_['All'].set('All' if checks >= len(vars_) - 1 else '')
 
