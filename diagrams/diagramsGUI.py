@@ -21,21 +21,22 @@ class Diagrams_Frame(tk.Frame):
         self.create_widgets()
     
     def create_widgets(self):
-        self.bar_fig, self.b_ax = plt.subplots(figsize=[8, 4], facecolor=(0.94, 0.94, 0.94))
+        # self.bar_fig, self.b_ax = plt.subplots(figsize=[8, 4], facecolor=(0.94, 0.94, 0.94))
+        self.bar_fig, self.b_ax = plt.subplots(figsize=[8, 6], facecolor=(0.94, 0.94, 0.94))
         self.tk_bar_fig = FigureCanvasTkAgg(self.bar_fig, self)
         self.tk_bar_fig.get_tk_widget().grid(row=0, column=0)        
 
         self.pie_fig, self.p_ax = plt.subplots(figsize=[2.5, 2.5], facecolor=(0.94, 0.94, 0.94))
         self.tk_pie_fig = FigureCanvasTkAgg(self.pie_fig, self)
-        self.tk_pie_fig.get_tk_widget().grid(row=1, column=0, sticky='w')
+        # self.tk_pie_fig.get_tk_widget().grid(row=1, column=0, sticky='w')
 
     def draw_diagrams(self):
         self.draw_bar()
-        self.draw_pie()
+        # self.draw_pie()
     
     def draw_bar(self):
         employers_data = self.get_orders_data()
-        free_data = employers_data.pop('Free')
+        free_orders = employers_data.pop('Free')
         employers = list(employers_data.keys())
         orders_nums = [len(employers_data[employer]) for employer in employers]
         max_num = max(orders_nums)
@@ -48,6 +49,7 @@ class Diagrams_Frame(tk.Frame):
         x = list(range(len(employers)))
         rects = self.b_ax.bar(x=x, height=orders_nums, color=colors)
         self.b_ax.grid(True, which='both', axis='y', alpha=0.15)
+        self.b_ax.set_title(f'Free orders: {len(free_orders)}')
         self.b_ax.set_xticks(x)
         self.b_ax.set_xticklabels(employers, rotation=90)
 
