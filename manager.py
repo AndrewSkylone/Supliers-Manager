@@ -13,13 +13,13 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 import openpyxl
-import matplotlib.pyplot as plot
+import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 from table import tableGUI
-from filemanager import filemanager
 from filtermenu import filterGUI
 from diagrams import diagramsGUI
+from filemanager import filemanager
 
 
 MYXLNUMB_INDEX = 0
@@ -40,23 +40,23 @@ class Suplier_Manager(object):
         self.__listeners = []
         self.__orders = ()
         self.__employers = ()
-        
         self.__statusbar = None
+        
         self.table = tableGUI.TableGUI(master=self, app=self, height=int(settings['table rows']))
         self.subscribe(self.table)
         self.filter = filterGUI.FilterGui(tearoff=1)
         self.filter.subscribe(self.table)
         self.subscribe(self.filter)
+        self.diagrams = diagramsGUI.Diagrams_Frame(master=self, app=self)
+        self.subscribe(self.diagrams)
 
         self.create_widgets()
 
         self.set_driver(driver=driver)
         self.set_employers(employers=settings['employers'])
-        self.set_orders(self.get_orders_from_file(file_path=ORDERS_PATH))        
-
+        self.set_orders(self.get_orders_from_file(file_path=ORDERS_PATH))
 
     def create_widgets(self):
-        self.table.__dict__['master'] = tk.LabelFrame(self, text='Label')
         self.table.grid(row=0, column=0)
 
         menubar = tk.Menu()
@@ -84,8 +84,8 @@ class Suplier_Manager(object):
         save_button.grid(row=1, column=2, sticky='w'+'e')
 
         # diagrams
-
-
+        self.diagrams.grid(row=0, column=1, rowspan=2)
+        
     def save_file(self, file_path=ORDERS_PATH):
         try:
             filemanager.save_orders_to_file(orders=self.get_orders(), file_path=file_path, save_backup=settings['save backups'])
@@ -149,10 +149,19 @@ class Suplier_Manager(object):
 
         return clear_orders
     
+    def get_free_orders(self) -> list:
+        free = []
+
+        for order in self.get_orders():
+            if order[EMPLOYER_INDEX] == FREE_MARK:
+                free.append(order)
+        
+        return free
+
     def get_employer_orders(self, employer) -> list:
         employer_orders = []
         for order in self.get_orders():
-            if order[3] == employer:
+            if order[EMPLOYER_INDEX] == employer:
                 employer_orders.append(order)
         
         return employer_orders
@@ -217,6 +226,11 @@ class Suplier_Manager_TopLevel(Suplier_Manager, tk.Toplevel):
         mouseX, mouseY = self.get_mouse_position()
         self.geometry(f"+{mouseX}+{mouseY}")
         self.resizable(True, False)
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)   
+
+    def on_closing(self):
+            self.destroy()
+            plt.close('all') 
                 
     def get_mouse_position(self):
         return self.master.winfo_pointerx(), self.master.winfo_pointery()
@@ -319,7 +333,7 @@ if __name__ == "__main__":
 
     def on_closing():
             root.destroy()
-            plot.close('all')
+            plt.close('all')
 
     root = tk.Tk()
 

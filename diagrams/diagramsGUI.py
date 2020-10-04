@@ -11,6 +11,8 @@ class Diagrams_Frame(tk.Frame):
         self.app = app
 
         self.__orders_data = {}
+        self.bar_fig = None
+        self.pie_fig = None
         self.b_ax = None
         self.p_ax = None
         self.tk_bar_fig = None
@@ -19,14 +21,15 @@ class Diagrams_Frame(tk.Frame):
         self.create_widgets()
     
     def create_widgets(self):
-        hist_fig, self.b_ax = plt.subplots()
-        self.tk_bar_fig = FigureCanvasTkAgg(hist_fig, self)
+        self.bar_fig, self.b_ax = plt.subplots(figsize=[8, 4], facecolor=(0.94, 0.94, 0.94))
+        self.tk_bar_fig = FigureCanvasTkAgg(self.bar_fig, self)
         self.tk_bar_fig.get_tk_widget().grid(row=0, column=0)
+        
 
-        pie_fig, self.p_ax = plt.subplots()
-        self.tk_pie_fig = FigureCanvasTkAgg(pie_fig, self)
-        self.tk_pie_fig.get_tk_widget().grid(row=0, column=1)
-        # hist_fig.set_dpi(100)
+        self.pie_fig, self.p_ax = plt.subplots(figsize=[2, 2])
+        self.tk_pie_fig = FigureCanvasTkAgg(self.pie_fig, self)
+        self.tk_pie_fig.get_tk_widget().grid(row=1, column=0)
+        # bar_fig.set_dpi(100)
 
     def draw_diagrams(self):
         orders_data = self.get_orders_data()
@@ -47,12 +50,27 @@ class Diagrams_Frame(tk.Frame):
             colors.append(color)
         
         x = list(range(len(labels)))
-        self.b_ax.bar(x=x, height=height, color=colors)
-        self.b_ax.grid(True, which='both', axis='y', alpha=0.2)
+        rects = self.b_ax.bar(x=x, height=height, color=colors)
+        self.b_ax.grid(True, which='both', axis='y', alpha=0.15)
+        self.b_ax.set_xticks(x)
+        self.b_ax.set_xticklabels(labels, rotation=90)
+
+        self.autolabel(rects=rects)
+        self.bar_fig.tight_layout()
 
     def draw_pie(self):
         self.p_ax.pie()
-    
+
+    def autolabel(self, rects):
+        """Attach a text label above each bar in *rects*, displaying its height."""
+        for rect in rects:
+            height = rect.get_height()
+            self.b_ax.annotate('{}'.format(height),
+                        xy=(rect.get_x() + rect.get_width() / 2, height),
+                        xytext=(0, 3),  # 3 points vertical offset
+                        textcoords="offset points",
+                        ha='center', va='bottom')
+
     def get_value_RGB_color(self, value, maxvalue) -> tuple:
         R, G = 0, 1
         RGB = [1, 1, 0]
