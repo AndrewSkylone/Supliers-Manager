@@ -20,25 +20,28 @@ class TableGUI(tk.Frame):
         self.table_height = height
         self.__listeners = []
         self.__table_orders = []
+
         self.table = TreeView(master=self, tableGUI=self, height=self.table_height)
         self.navigator = Navigator(master=self, tableGUI=self)
         self.subscribe(self.navigator)
-        self.navigator.subscribe(self.table)
+        self.navigator.subscribe(self.table)        
+        self.search = Search_Entry(master=self, app=app)
+        self.search.subscribe(self)
+        self.subscribe(self.search)
 
         self.create_widgets()
     
     def create_widgets(self):
-        self.table.grid(row=0, column=0, columnspan=2)
-        self.navigator.grid(row=1, column=0, padx=5, pady=5, sticky='w')
+        self.table.grid(row=1, column=0, columnspan=2, padx=5)
+        self.navigator.grid(row=2, column=0, padx=5, pady=5, sticky='w')
 
-        employers_frame = tk.Frame(self)
-        employers_frame.grid(row=1, column=1, padx=5, pady=5, sticky='e'+'w'+'n')
-
-        variable = tk.StringVar()
-        self.employers_menu = tk.OptionMenu(employers_frame, variable, ' ')
-        self.employers_menu.config(font=('Arial', 13), width=16)
+        self.search.grid(row=0, column=0, padx=5, sticky='w')
+                
+        variable = tk.StringVar(value='user')
+        self.employers_menu = tk.OptionMenu(self, variable, ' ')
+        self.employers_menu.config(font=('Calibri', 13), width=16)
         self.employers_menu.variable = variable
-        self.employers_menu.grid(row=0, column=0, sticky='w' + 'e')
+        self.employers_menu.grid(row=0, column=1, padx=5, sticky='w' + 'e')
         variable.trace('w', self.send_orders)
 
     def get_table_orders(self) -> list:
@@ -92,6 +95,9 @@ class TableGUI(tk.Frame):
         
         pyperclip.copy(for_copy)
         self.app.set_orders(orders=orders)
+
+    def on_search_orders_changed(self, orders):
+        self.set_table_orders(orders=orders)
 
 class TreeView(ttk.Treeview):
     def __init__(self, master, tableGUI, **kw):
@@ -184,10 +190,10 @@ class Navigator(tk.Frame):
         self.create_widgets()
     
     def create_widgets(self):
-        buttons = ["First", "Previous", "Next", "Last"]
+        buttons = ["First", "Prev", "Next", "Last"]
 
         for column, goto in zip((0, 1, 3, 4), buttons):
-            button = tk.Button(self, text=goto, font=("Calibri", 12), width=7)
+            button = tk.Button(self, text=goto, font=("Calibri", 12), width=5)
             button.config(command=lambda goto=goto: self.goto_page(goto_page=goto))
             button.grid(row=0, column=column, sticky="w"+"e")
 
@@ -252,3 +258,73 @@ class Navigator(tk.Frame):
             self.page.set(pages)
         else:
             self.page.set(1)
+
+class Search_Entry(tk.Entry):
+    def __init__(self, master, app, cnf={}, **kw):
+        self.textvariable = tk.StringVar(value='Search')
+        kw['textvariable'] = self.textvariable
+        tk.Entry.__init__(self, master=master, cnf=cnf, **kw)
+        
+        self.app = app
+        self.__orders = []
+        self.__listeners = []
+
+        self.configurate()
+
+    def configurate(self):
+        self.config(font=('Calibri', 16), justify="center", fg='gray')
+
+        self.bind("<FocusIn>", self.on_search_focusIn)
+        self.bind("<FocusOut>", self.on_search_focusOut)
+        self.bind("<Return>", self.find)
+        self.bind('<Button-3>', self.on_button3_pressed)
+        
+    def get_orders(self) -> list:
+        return copy.deepcopy(self.__orders)
+    
+    def set_orders(self, orders):
+        self.__orders = copy.deepcopy(orders)
+        self.notify()
+    
+    def on_button3_pressed(self, event):
+        self.textvariable.set('')
+        self.focus()
+    
+    def set_text(self, fg='gray', text='Search'):
+        self.config(fg=fg)
+        self.textvariable.set(text)
+    
+    def on_search_focusIn(self, event):
+        if self.textvariable.get() == 'Search':
+            self.set_text(fg='black', text='')
+
+    def on_search_focusOut(self, event):
+        if self.textvariable.get() == '':
+            self.set_text(fg='gray', text='Search')
+    
+    def find(self, event=None):
+        """ Find Search_Entry text in backup orders. Split it for searching first element
+        in the rows with spaces """
+
+        orders = self.app.get_orders()
+        text = self.textvariable.get()
+
+        if not text:
+            self.set_orders(orders=orders)
+            return
+        
+        result = []
+        text = text.split()[0]
+        for order in orders:
+            for col in order:
+                if text in col:
+                    result.append(order)
+        self.set_orders(orders=result)
+
+    def subscribe(self, listener):
+        self.__listeners.append(listener)    
+    
+    def notify(self):
+        for listener in self.__listeners:
+            if hasattr(listener, 'on_search_orders_changed'):
+                listener.on_search_orders_changed(orders=self.get_orders())
