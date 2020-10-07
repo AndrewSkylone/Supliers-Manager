@@ -61,7 +61,7 @@ def save_employers_data_to_table(employers_data : dict, table_path):
         
     workbook.save(table_path)
 
-def get_employers_from_file(file_path) -> list:
+def get_employers_from_txt(file_path) -> list:
     with open(file_path, 'r') as f:
         return [line.strip() for line in f.readlines()]
 

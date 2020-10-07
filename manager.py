@@ -204,13 +204,17 @@ class Suplier_Manager(object):
         return self.__driver
     
     def set_status(self, fg='green', message='task finished successfully'):
+        def clear_ord_status(text):
+            if statusbar.textvariable.get() == text:
+                statusbar.textvariable.set('')
+
         display_time = 4000
         statusbar = self.__statusbar
 
         statusbar.config(fg=fg)
         statusbar.textvariable.set(message)
         statusbar.update()     
-        statusbar.after(display_time, statusbar.textvariable.set, '')
+        statusbar.after(display_time, clear_ord_status, message)       
     
     def config(self, cnf={}, **kw):
         raise NotImplementedError
