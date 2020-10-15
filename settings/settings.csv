@@ -1,5 +1,5 @@
-employers;table rows;save backups;profile path
-Erik Aleschenko;20;Yes;C:\Users\andre\AppData\Local\Google\Chrome\User Data
-Ludmyla Stupnytska;;;
-Lesia Korbutyak;;;
-Maryna Mostishko;;;
+employers;table rows;save backups;profile path;user agent;email;password
+Erik Aleschenko;20;Yes;C:\Users\andre\AppData\Local\Google\Chrome\User Data;"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36";;
+Ludmyla Stupnytska;;;;;;
+Lesia Korbutyak;;;;;;
+Maryna Mostishko;;;;;;

@@ -99,7 +99,6 @@ class Suplier_Manager(object):
 
     def read_nes_table(self):
         nes_orders = Supliers_Table().get_orders()
-        return
         marked_orders = self.mark_orders_by_employers(marked_orders=self.get_orders(), clear_orders=nes_orders)
 
         self.set_orders(orders=marked_orders)
@@ -271,7 +270,6 @@ class Supliers_Table(object):
         for page in range(1, pages + 1):
             orders += orders_dict[page]
 
-        print(*orders, sep='\n')
         self.set_orders(orders=orders)
 
     def get_orders_from_page(self, page : int, out_dict : dict):
@@ -281,41 +279,30 @@ class Supliers_Table(object):
         orders = []
         for data in orders_data:
             order = []
-            for key in ('number', 'created_at', 'id'):
-                order.append(data[key])
+            order.append(data['number'])
+            order.append(data['created_at'].split()[0])
+            order.append(data['id'])
+
             orders.append(order + [FREE_MARK])
         
-        out_dict.update({page : orders})
-    
-    def __new__(cls):
-        if not hasattr(cls, 'instance'):
-            cls.instance = object.__new__(cls)
-        return cls.instance
-
-    @staticmethod
-    def __get_orders_from_page(page : dict) -> list:
-        orders = []
-        orders_data = page['data']
-
-        for data in orders_data:
-            order = []
-            for key in ('number', 'created_at', 'id'):
-                order.append(data[key])
-            orders.append(order + [FREE_MARK])
-        return orders
+        out_dict.update({page : orders})    
 
     def authorize_session(self, session):
-        # user_agent = settings['user agent']
-        # email = settings["skrypnyk@myxlshop.com"] 
-        # password = settings["05031995" ]
-        user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36"
+        user_agent = settings['user agent']
+        email = settings['email'] 
+        password = settings['password']
         url = "https://apines.hktemas.com/api/signin"
-        email = "skrypnyk@myxlshop.com"
-        password = "05031995"
+
         session.headers.update({'Referer':url, 'User-Agent': user_agent})
         data = {'email' : email, 'password' : password}
         r = session.put(url, data)
         session.headers.update({'authorization' : 'Bearer ' + json.loads(r.text)['token']})
+
+    def __new__(cls):
+        if not hasattr(cls, 'instance'):
+            cls.instance = object.__new__(cls)
+        return cls.instance
+    
     
 if __name__ == "__main__":
 
