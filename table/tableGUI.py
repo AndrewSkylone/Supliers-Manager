@@ -122,7 +122,7 @@ class TreeView(ttk.Treeview):
 
         self.heading('#0', text="№")
         self.heading(0, text="MYXL number")
-        self.heading(1, text="Updated date", command=self.tableGUI.sort_orders_by_date)
+        self.heading(1, text="Creation date", command=self.tableGUI.sort_orders_by_date)
         self.heading(2, text="Order number")
         self.heading(3, text="User", command=self.tableGUI.sort_orders_by_user)
 

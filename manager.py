@@ -5,6 +5,9 @@ import re
 from datetime import datetime
 import csv
 import copy
+import json
+import requests
+import threading
 
 from selenium import webdriver
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
@@ -106,11 +109,8 @@ class Suplier_Manager(object):
             return orders
 
     def read_nes_table(self):
-        if not self.get_driver():
-            self.set_status(fg='red', message='Driver error. Execute driver to continue')
-            return
-
-        nes_orders = self.get_driver().read_supliers_table()
+        nes_orders = Extended_Webdriver.read_supliers_table()
+        return
         marked_orders = self.mark_orders_by_employers(marked_orders=self.get_orders(), clear_orders=nes_orders)
 
         self.set_orders(orders=marked_orders)
@@ -204,17 +204,17 @@ class Suplier_Manager(object):
         return self.__driver
     
     def set_status(self, fg='green', message='task finished successfully'):
-        def clear_ord_status(text):
+        def clear_status_if_contain(text):
             if statusbar.textvariable.get() == text:
                 statusbar.textvariable.set('')
 
-        display_time = 4000
+        display_time = 6000
         statusbar = self.__statusbar
 
         statusbar.config(fg=fg)
         statusbar.textvariable.set(message)
         statusbar.update()     
-        statusbar.after(display_time, clear_ord_status, message)       
+        statusbar.after(display_time, clear_status_if_contain, message)       
     
     def config(self, cnf={}, **kw):
         raise NotImplementedError
@@ -267,75 +267,73 @@ class Suplier_Manager_Frame(Suplier_Manager, tk.Frame):
     def title(self, title):
         self.master.title(title)
 
-class Extended_Webdriver(object):
-    @classmethod
-    def extend_driver(cls, driver : webdriver.Chrome):
-        """ Extending driver functional to all Extended_Webdriver functions """
+class Supliers_Table(object):    
+    def __init__(self):
+        self.table_url = 'https://apines.hktemas.com/api/orders?noSupplier=1&with=customer;orderItems;shop;bucket&page={%d}&limit=5&orderBy=id&sortedBy=desc'
+        self.session = requests.Session()
+        self.__orders = []
 
-        for attr in cls.__dict__:
-            if not hasattr(driver.__class__, attr):
-                setattr(driver.__class__, attr, cls.__dict__[attr])
+        self.authorize_session(session=self.session)
+
+    def get_orders(self) -> list:
+        return copy.deepcopy(self.__orders)
+    
+    def set_orders(self, orders):
+        self.__orders = copy.deepcopy(orders)
+        
+    def read_supliers_table(self):        
+        first_page_data = self.session.get(self.table_url % 1)
+        pages = json.loads(first_page_data.text)['last_page']
+
+        pages = 3
+        orders = []
+        for page in range(pages):
+            x = threading.Thread(target=self.get_orders_from_page, args=(page, orders))
+            x.start()
+
+        self.set_orders(orders=orders)
+
+    def get_orders_from_page(self, page : int, out_list : list):
+        request = self.session.get(self.table_url % page) 
+        orders = []
+        orders_data = page['data']
+
+        for data in orders_data:
+            order = []
+            for key in ('number', 'created_at', 'id'):
+                order.append(data[key])
+            orders.append(order + [FREE_MARK])
+    
+    def __new__(cls):
+        if not hasattr(cls, 'instance'):
+            cls.instance = object.__new__(cls)
+        return cls.instance
+
 
     @staticmethod
-    def create_profile_chrome_driver(executable_path, profile_path) -> webdriver.Chrome:
-        chrome_options = Options()
-        chrome_options.add_argument(fr"user-data-dir={profile_path}")
-        caps = DesiredCapabilities().CHROME
-        caps["pageLoadStrategy"] = "none"
-
-        return webdriver.Chrome(desired_capabilities=caps, executable_path=executable_path, options=chrome_options)          
-
-    def read_supliers_table(self) -> list:
-        table_element = self.find_element_by_class_name("table-primary")
-        pages_element = table_element.find_element(By.TAG_NAME, "pre")        
-        pages = re.search('Page: (\d+) / (\d+)', pages_element.text)
-        current_page = int(pages.group(1))
-        last_page = int(pages.group(2))
+    def __get_orders_from_page(page : dict) -> list:
         orders = []
+        orders_data = page['data']
 
-        if current_page != 1:
-            self.goto_nes_table_first_page(table_element=table_element)
-
-        for current in range(last_page):
-            orders += self.read_supliers_page_orders(table_element=table_element)
-            if current < last_page - 1:
-                self.goto_nes_table_next_page(table_element=table_element)
-    
-        return orders
-
-    def goto_nes_table_first_page(self, table_element):
-        """ Press first button in NES table. Checking if table text changed, else page not switched """
-
-        first_button = table_element.find_element_by_link_text("First")
-        self.execute_script("arguments[0].click()", first_button)        
-        WebDriverWait(self, 5).until_not(EC.text_to_be_present_in_element((By.CLASS_NAME, "table-primary"), table_element.text))
-    
-    def goto_nes_table_next_page(self, table_element):
-        """ Press next button in NES table. Checking if table text changed, else page not switched """
-
-        next_button = table_element.find_element_by_link_text("Next")
-        self.execute_script("arguments[0].click()", next_button)
-        WebDriverWait(self, 5).until_not(EC.text_to_be_present_in_element((By.CLASS_NAME, "table-primary"), table_element.text))
-
-    def read_supliers_page_orders(self, table_element) -> list:
-        """ Read supliers MYXLnumber, update date, number columns data. Using search all td elements instead selector because it faster.
-            Mark all orders as free by FREE_MARK """
-
-        tbody_element = table_element.find_element(By.CSS_SELECTOR, "tbody")
-        rows = len(tbody_element.find_elements(By.CSS_SELECTOR, "tr"))
-        td_elements = tbody_element.find_elements(By.CSS_SELECTOR, "td")
-        COLUMNS = 8
-        
-        orders = []
-
-        for row in range(rows):
+        for data in orders_data:
             order = []
-            order.append(td_elements[row * COLUMNS + 4].text)
-            order.append(td_elements[row * COLUMNS + 2].text.split(' ')[0])
-            order.append(td_elements[row * COLUMNS + 0].text)
+            for key in ('number', 'created_at', 'id'):
+                order.append(data[key])
             orders.append(order + [FREE_MARK])
-
         return orders
+
+    def authorize_session(self, session):
+        # user_agent = settings['user agent']
+        # email = settings["skrypnyk@myxlshop.com"] 
+        # password = settings["05031995" ]
+        user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36"
+        url = "https://apines.hktemas.com/api/signin"
+        email = "skrypnyk@myxlshop.com"
+        password = "05031995"
+        session.headers.update({'Referer':url, 'User-Agent': user_agent})
+        data = {'email' : email, 'password' : password}
+        r = session.put(url, data)
+        session.headers.update({'authorization' : 'Bearer ' + json.loads(r.text)['token']})
     
 if __name__ == "__main__":
 
