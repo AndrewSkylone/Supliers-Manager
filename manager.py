@@ -9,12 +9,6 @@ import json
 import requests
 import threading
 
-from selenium import webdriver
-from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
 import openpyxl
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -37,9 +31,8 @@ FREE_MARK = ' '
 settings = filemanager.read_csv_settings(file_path=os.path.join(MANAGER_DIR_PATH, "settings", "settings.csv"))
 
 class Suplier_Manager(object):
-    def __init__(self, driver=None):
+    def __init__(self):
         self.title(title='Suplier Manager')
-        self.__driver = None
         self.__listeners = []
         self.__orders = ()
         self.__employers = ()
@@ -55,7 +48,6 @@ class Suplier_Manager(object):
 
         self.create_widgets()
 
-        self.set_driver(driver=driver)
         self.set_employers(employers=settings['employers'])
         self.set_orders(self.get_orders_from_file(file_path=ORDERS_PATH))
 
@@ -77,14 +69,11 @@ class Suplier_Manager(object):
         self.__statusbar.textvariable = statusvar
         self.__statusbar.grid(row=0, column=0, pady=5, sticky='w'+'e')
 
-        execute_button = tk.Button(buttons_frame, text="execute driver", font=("Calibri", 12), command=self.execute_driver)
-        execute_button.grid(row=1, column=0, sticky='w'+'e')
-
         read_nes_table_button = tk.Button(buttons_frame, text="read NES orders", font=("Calibri", 12), command=self.read_nes_table)
-        read_nes_table_button.grid(row=1, column=1, sticky='w'+'e')
+        read_nes_table_button.grid(row=1, column=0, sticky='w'+'e')
 
         save_button = tk.Button(buttons_frame, text="save file", font=("Calibri", 12), command=self.save_file)
-        save_button.grid(row=1, column=2, sticky='w'+'e')
+        save_button.grid(row=1, column=1, sticky='w'+'e')
 
         # diagrams
         self.diagrams.grid(row=0, column=1, rowspan=2)
@@ -109,25 +98,12 @@ class Suplier_Manager(object):
             return orders
 
     def read_nes_table(self):
-        nes_orders = Extended_Webdriver.read_supliers_table()
+        nes_orders = Supliers_Table().get_orders()
         return
         marked_orders = self.mark_orders_by_employers(marked_orders=self.get_orders(), clear_orders=nes_orders)
 
         self.set_orders(orders=marked_orders)
         self.set_status(message='reading succsessfully')
-
-    def execute_driver(self):
-        executable_path = os.path.join(MANAGER_DIR_PATH, "chromedriver", "chromedriver.exe")
-        profile_path = settings['profile path']
-
-        try:
-            driver = Extended_Webdriver.create_profile_chrome_driver(executable_path, profile_path)
-        except:
-            self.set_status(fg='red', message='Driver failed. Close chrome windows to continue')
-        else:            
-            driver.get("https://nesky.hktemas.com/no-suppliers")
-            self.set_driver(driver)
-            self.set_status(fg='green', message='driver ready')
 
     def get_orders(self) -> list:
         return list(copy.deepcopy(self.__orders))
@@ -195,13 +171,6 @@ class Suplier_Manager(object):
     def subscribe(self, listener):
         self.__listeners.append(listener)
     
-    def set_driver(self, driver):
-        if driver:
-            Extended_Webdriver.extend_driver(driver=driver)
-        self.__driver = driver
-    
-    def get_driver(self) -> webdriver:
-        return self.__driver
     
     def set_status(self, fg='green', message='task finished successfully'):
         def clear_status_if_contain(text):
@@ -225,9 +194,9 @@ class Suplier_Manager(object):
 class Suplier_Manager_TopLevel(Suplier_Manager, tk.Toplevel):
     """ Singleton """
 
-    def __init__(self, master, driver=None, cnf={}, **kw):
+    def __init__(self, master, cnf={}, **kw):
         tk.Toplevel.__init__(self, master, cnf, **kw)
-        Suplier_Manager.__init__(self, driver)
+        Suplier_Manager.__init__(self)
 
         self.__class__.instance = self
 
@@ -255,9 +224,9 @@ class Suplier_Manager_TopLevel(Suplier_Manager, tk.Toplevel):
         tk.Toplevel.title(self, title)
 
 class Suplier_Manager_Frame(Suplier_Manager, tk.Frame):
-    def __init__(self, master, driver=None, cnf={}, **kw):
+    def __init__(self, master, cnf={}, **kw):
         tk.Frame.__init__(self, master, cnf, **kw)
-        Suplier_Manager.__init__(self, driver)
+        Suplier_Manager.__init__(self)
 
         self.master.resizable(True, False)
     
@@ -268,12 +237,15 @@ class Suplier_Manager_Frame(Suplier_Manager, tk.Frame):
         self.master.title(title)
 
 class Supliers_Table(object):    
+    """ Singleton """
+    
     def __init__(self):
-        self.table_url = 'https://apines.hktemas.com/api/orders?noSupplier=1&with=customer;orderItems;shop;bucket&page={%d}&limit=5&orderBy=id&sortedBy=desc'
+        self.table_url = 'https://apines.hktemas.com/api/orders?noSupplier=1&with=customer;orderItems;shop;bucket&page=%d&limit=5&orderBy=id&sortedBy=desc'
         self.session = requests.Session()
         self.__orders = []
 
         self.authorize_session(session=self.session)
+        self.read_supliers_table()
 
     def get_orders(self) -> list:
         return copy.deepcopy(self.__orders)
@@ -284,31 +256,41 @@ class Supliers_Table(object):
     def read_supliers_table(self):        
         first_page_data = self.session.get(self.table_url % 1)
         pages = json.loads(first_page_data.text)['last_page']
-
-        pages = 3
         orders = []
-        for page in range(pages):
-            x = threading.Thread(target=self.get_orders_from_page, args=(page, orders))
-            x.start()
+        threads = []
 
+        orders_dict = {}
+        for page in range(1, pages + 1):
+            thread = threading.Thread(target=self.get_orders_from_page, args=(page, orders_dict))
+            threads.append(thread)
+            thread.start()
+        
+        for thread in threads:
+            thread.join()
+        
+        for page in range(1, pages + 1):
+            orders += orders_dict[page]
+
+        print(*orders, sep='\n')
         self.set_orders(orders=orders)
 
-    def get_orders_from_page(self, page : int, out_list : list):
-        request = self.session.get(self.table_url % page) 
-        orders = []
-        orders_data = page['data']
+    def get_orders_from_page(self, page : int, out_dict : dict):
+        page_data = self.session.get(self.table_url % page) 
+        orders_data = json.loads(page_data.text)['data']
 
+        orders = []
         for data in orders_data:
             order = []
             for key in ('number', 'created_at', 'id'):
                 order.append(data[key])
             orders.append(order + [FREE_MARK])
+        
+        out_dict.update({page : orders})
     
     def __new__(cls):
         if not hasattr(cls, 'instance'):
             cls.instance = object.__new__(cls)
         return cls.instance
-
 
     @staticmethod
     def __get_orders_from_page(page : dict) -> list:
