@@ -8,6 +8,7 @@ import copy
 import json
 import requests
 import threading
+import traceback
 
 import openpyxl
 import matplotlib.pyplot as plt
@@ -63,7 +64,7 @@ class Suplier_Manager(object):
         buttons_frame.grid(row=1, column=0, padx=5, pady=5, sticky='w'+'e')
 
         statusbar = tk.LabelFrame(buttons_frame, text='status')
-        statusbar.grid(row=0, column=0, columnspan=3, sticky='w'+'e')
+        statusbar.grid(row=0, column=0, columnspan=2, sticky='w'+'e')
         statusvar = tk.StringVar() 
         self.__statusbar = tk.Entry(statusbar, state='readonly', font=("Calibri", 14), width=40, bd=0, textvariable=statusvar, justify='center')
         self.__statusbar.textvariable = statusvar
@@ -99,14 +100,17 @@ class Suplier_Manager(object):
 
     def read_nes_table(self):
         self.set_status(fg='green', message='start reading table...')
+
         try:
             nes_orders = Supliers_Table(app=self).get_orders()
-        except:
+        except Exception as e:
+            print(e)
             self.set_status(fg='red', message='reading failed')
-        marked_orders = self.mark_orders_by_employers(marked_orders=self.get_orders(), clear_orders=nes_orders)
+        else:
+            marked_orders = self.mark_orders_by_employers(marked_orders=self.get_orders(), clear_orders=nes_orders)
 
-        self.set_orders(orders=marked_orders)
-        self.set_status(fg='green', message='reading succsessfully')
+            self.set_orders(orders=marked_orders)
+            self.set_status(fg='green', message='reading succsessfully')
 
     def get_orders(self) -> list:
         return list(copy.deepcopy(self.__orders))
@@ -271,12 +275,21 @@ class Supliers_Table(object):
         
         for index, thread in enumerate(threads):
             thread.join()
-            self.app.set_status(fg='black', message='Reading table: page %d / %d' % (index, pages))
+            self.app.set_status(fg='black', message='Reading table: page %d / %d' % (index + 1, pages))
         
         for page in range(1, pages + 1):
             orders += orders_dict[page]
 
         self.set_orders(orders=orders)
+
+        # finding dublicate
+        dublicates = {}
+        for i, order in enumerate(orders):
+            if orders.count(order) > 1:
+                dublicates[i] = order
+        
+        if dublicates:
+            tk.messagebox.showwarning(title='dublicates found', message = f'{dublicates}')
 
     def get_orders_from_page(self, page : int, out_dict : dict):
         page_data = self.session.get(self.table_url % page) 
