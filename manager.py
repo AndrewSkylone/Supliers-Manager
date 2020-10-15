@@ -98,11 +98,15 @@ class Suplier_Manager(object):
             return orders
 
     def read_nes_table(self):
-        nes_orders = Supliers_Table().get_orders()
+        self.set_status(fg='green', message='start reading table...')
+        try:
+            nes_orders = Supliers_Table(app=self).get_orders()
+        except:
+            self.set_status(fg='red', message='reading failed')
         marked_orders = self.mark_orders_by_employers(marked_orders=self.get_orders(), clear_orders=nes_orders)
 
         self.set_orders(orders=marked_orders)
-        self.set_status(message='reading succsessfully')
+        self.set_status(fg='green', message='reading succsessfully')
 
     def get_orders(self) -> list:
         return list(copy.deepcopy(self.__orders))
@@ -238,7 +242,8 @@ class Suplier_Manager_Frame(Suplier_Manager, tk.Frame):
 class Supliers_Table(object):    
     """ Singleton """
     
-    def __init__(self):
+    def __init__(self, app):
+        self.app = app
         self.table_url = 'https://apines.hktemas.com/api/orders?noSupplier=1&with=customer;orderItems;shop;bucket&page=%d&limit=5&orderBy=id&sortedBy=desc'
         self.session = requests.Session()
         self.__orders = []
@@ -264,8 +269,9 @@ class Supliers_Table(object):
             threads.append(thread)
             thread.start()
         
-        for thread in threads:
+        for index, thread in enumerate(threads):
             thread.join()
+            self.app.set_status(fg='black', message='Reading table: page %d / %d' % (index, pages))
         
         for page in range(1, pages + 1):
             orders += orders_dict[page]
@@ -285,7 +291,7 @@ class Supliers_Table(object):
 
             orders.append(order + [FREE_MARK])
         
-        out_dict.update({page : orders})    
+        out_dict.update({page : orders})
 
     def authorize_session(self, session):
         user_agent = settings['user agent']
@@ -298,7 +304,7 @@ class Supliers_Table(object):
         r = session.put(url, data)
         session.headers.update({'authorization' : 'Bearer ' + json.loads(r.text)['token']})
 
-    def __new__(cls):
+    def __new__(cls, *args, **kw):
         if not hasattr(cls, 'instance'):
             cls.instance = object.__new__(cls)
         return cls.instance
