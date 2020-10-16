@@ -35,8 +35,8 @@ class Suplier_Manager(object):
     def __init__(self):
         self.title(title='Suplier Manager')
         self.__listeners = []
-        self.__orders = ()
-        self.__employers = ()
+        self.__orders = []
+        self.__employers = []
         self.__statusbar = None
         
         self.table = tableGUI.TableGUI(master=self, app=self, height=int(settings['table rows']))
@@ -113,11 +113,24 @@ class Suplier_Manager(object):
             self.set_status(fg='green', message='reading succsessfully')
 
     def get_orders(self) -> list:
-        return list(copy.deepcopy(self.__orders))
+        return copy.deepcopy(self.__orders)
     
     def set_orders(self, orders):
-        self.__orders = tuple(copy.deepcopy(orders))
+        self.__orders = copy.deepcopy(orders)
+
+        self.notify_for_dublicates(orders)
         self.notify(changed='orders')
+    
+    def notify_for_dublicates(self, orders):
+        dublicates = {}
+        orders_numbers = [order[MYXLNUMB_INDEX] for order in orders]
+        for i, number in enumerate(orders_numbers):
+            if orders_numbers.count(number) > 1:
+                dublicates[i] = orders[i]
+        
+        if dublicates:
+            message = ''.join([str(k) + ' : ' + str(v) + '\n' for k, v in dublicates.items()])
+            tk.messagebox.showwarning(title='dublicates found', message=message)
     
     def mark_orders_by_employers(self, marked_orders, clear_orders) -> list:
         """ Marks orders by name of the employers who have this orders """
@@ -160,10 +173,10 @@ class Suplier_Manager(object):
         return employers_data        
 
     def get_employers(self) -> list:
-        return list(copy.deepcopy(self.__employers))
+        return copy.deepcopy(self.__employers)
     
     def set_employers(self, employers : list):
-        self.__employers = tuple(employers)
+        self.__employers = employers
         self.notify(changed='employers')
     
     def notify(self, changed : str):
@@ -281,15 +294,6 @@ class Supliers_Table(object):
             orders += orders_dict[page]
 
         self.set_orders(orders=orders)
-
-        # finding dublicate
-        dublicates = {}
-        for i, order in enumerate(orders):
-            if orders.count(order) > 1:
-                dublicates[i] = order
-        
-        if dublicates:
-            tk.messagebox.showwarning(title='dublicates found', message = f'{dublicates}')
 
     def get_orders_from_page(self, page : int, out_dict : dict):
         page_data = self.session.get(self.table_url % page) 
