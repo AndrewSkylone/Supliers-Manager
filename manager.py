@@ -39,7 +39,7 @@ class Suplier_Manager(object):
         self.__employers = []
         self.__statusbar = None
         
-        self.table = tableGUI.TableGUI(master=self, app=self, height=int(settings['table rows']))
+        self.table = tableGUI.TableGUI(master=self, app=self, height=int(settings.get('table rows', 15)))
         self.subscribe(self.table)
         self.filter = filterGUI.FilterGui(tearoff=1)
         self.filter.subscribe(self.table)
@@ -81,7 +81,7 @@ class Suplier_Manager(object):
         
     def save_file(self, file_path=ORDERS_PATH):
         try:
-            filemanager.save_orders_to_file(orders=self.get_orders(), file_path=file_path, save_backup=settings['save backups'])
+            filemanager.save_orders_to_file(orders=self.get_orders(), file_path=file_path, save_backup=settings.get('save backups', 'No'))
             filemanager.save_employers_data_to_table(employers_data=self.get_employers_data(), table_path=ORDERS_PATH)
         except:
             self.set_status(fg='red', message='Saving file failed')
@@ -104,8 +104,7 @@ class Suplier_Manager(object):
         try:
             nes_orders = Supliers_Table(app=self).get_orders()
         except Exception as e:
-            print(e)
-            self.set_status(fg='red', message='reading failed')
+            self.set_status(fg='red', message='reading failed. ' + str(e))
         else:
             marked_orders = self.mark_orders_by_employers(marked_orders=self.get_orders(), clear_orders=nes_orders)
 
@@ -126,7 +125,7 @@ class Suplier_Manager(object):
         orders_numbers = [order[MYXLNUMB_INDEX] for order in orders]
         for i, number in enumerate(orders_numbers):
             if orders_numbers.count(number) > 1:
-                dublicates[i] = orders[i]
+                dublicates[i+1] = orders[i]
         
         if dublicates:
             message = ''.join([str(k) + ' : ' + str(v) + '\n' for k, v in dublicates.items()])
@@ -282,13 +281,17 @@ class Supliers_Table(object):
 
         orders_dict = {}
         for page in range(1, pages + 1):
+            self.app.set_status(fg='black', message='start page %d / %d' % (page, pages))
+
             thread = threading.Thread(target=self.get_orders_from_page, args=(page, orders_dict))
             threads.append(thread)
-            thread.start()
+            thread.start()            
         
         for index, thread in enumerate(threads):
             thread.join()
-            self.app.set_status(fg='black', message='Reading table: page %d / %d' % (index + 1, pages))
+
+            page = index + 1
+            self.app.set_status(fg='black', message='finished page %d / %d' % (page, pages))
         
         for page in range(1, pages + 1):
             orders += orders_dict[page]
@@ -311,8 +314,8 @@ class Supliers_Table(object):
         out_dict.update({page : orders})
 
     def authorize_session(self, session):
-        user_agent = settings['user agent']
-        email = settings['email'] 
+        user_agent = settings.get('user agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36')
+        email = settings['email']
         password = settings['password']
         url = "https://apines.hktemas.com/api/signin"
 
