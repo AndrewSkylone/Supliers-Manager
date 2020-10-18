@@ -281,7 +281,7 @@ class Supliers_Table(object):
 
         orders_dict = {}
         for page in range(1, pages + 1):
-            self.app.set_status(fg='black', message='start page %d / %d' % (page, pages))
+            self.app.set_status(fg='black', message='start reading page %d / %d' % (page, pages))
 
             thread = threading.Thread(target=self.get_orders_from_page, args=(page, orders_dict))
             threads.append(thread)
